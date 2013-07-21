@@ -42,18 +42,18 @@ For a given bone, the transformation parameters it possesses are as shown below:
 
 ・Rotation/Translation caused by user control  	| In PMX/PMD Editor a scale parameter is also used	#Presumably 'user control' is talking about motion, such as that found in VMD files
 ・Rotation/Translation caused by Bone morphs	#Not sure if 'morph' is a commonly used term in 3D graphics, but here I believe it's talking about bone morphs that cause changes in facial expression
-・When 'allowed'     Rotation Allowed／Translation Allowed  | By saving the parameter, Several allowances are possible	#This is talking about the rotationAllowed and movementAllowed variables in PMXBone
+・When 'Given'     Given Rotation／Given Translation  | By saving the parameter, Several allowances are possible	#This is talking about the giveRotation and giveTranslation variables in PMXBone
 ・In the case of IK Links     IK Rotation
 
-・Local transformation state for bone transformation processing
-・Global shape transformation state for stuff like Vertexes and shape transformations
+・Local transformation variables for bone transformation processing
+・Global shape transformation variables for stuff like Vertexes and shape transformations
 
-※Rotation is Quaternions, Translation/Movement is 3D vector, transformation state is designed for use with homogeneous transformation matrix
+※Rotation is Quaternions, Translation/Movement is 3D vector, transformation variables are designed for use with homogeneous transformation matrix
 
 
-□About 'allowed'(allowances)
+□About 'Given'
 
-With allowance, the Allowed Parent bone's:
+With 'Given', the Given Parent bone's:
 
 ・Rotation/Translation based on user control
 ・Rotation/Translation based on bone morphs
@@ -63,40 +63,40 @@ With allowance, the Allowed Parent bone's:
 The above translation amount is added to the bone (so an even further translation is added).
 Rotation/translation are each added as separate items (it's fine to just have/add one)	#...?
 
-付与親の親子変形によるボーン変形状態は付与対象ではないので注意。
+The Given Parent's Parent-Child transformation resulting transformation variable is not a target of giving so be careful.
 
-付与変形を行った後、付与した変形量をボーン内に保存し、
-別の付与ボーンから付与親参照された場合にその変形量を渡す→多重付与構造
+After the Giving transformation has been done, the Given transformation amount is saved within the bone,
+And in the case a Given Parent from a different Given Bone, that transformation amount is handed over to form a multiple-Given structure.
 
-当然ながら付与ボーンでも親子関係による通常のボーン変形は可能となる。
+Obviously even Given Bones can have normal bone transformation caused by a Parent/Child relationship.
 
 
 □The order for properly using transformation parameters
 
-0. すべてのボーンのローカル／グローバル変形状態を初期化
-1. ユーザー操作の回転／移動量をすべてのボーンに設定
-2. ボーンモーフによる回転／移動量を対応するボーンに設定
+0. Reset all local/global transformation variables to their default state
+1. Set user-controlled rotation/translation for all bones
+2. Set rotation/translation caused by bone morph for all bones
 
-3. 変形順序の正規化
-4. 正規化後の順にボーン変形を行う
+3. 'Normalize'(Standardize) Transformation Order	#I think it's saying here: Put the bones in the correct order for transforming
+4. After 'normalization', transform bones in order
 
-4.1. ボーンのローカル変形(詳細は後述)
-4.2. IKの場合IK変形
-
-
-以上の手順ですべてのボーンを変形。
-
-物理変形後の適用は、物理変形によるグローバル変形量をローカル変形量に一旦戻し、
-それを親参照する変形を継続することで行われる。
+4.1. Bone's local transformation (details explained later on)
+4.2. In the case of IK, IK transformation
 
 
+With the above steps, all bones are transformed.
 
-□ローカル変形順序
+The correct usage of transformation after physics is, take the global physical(physics) transformation and temporarily convert it to local transformation,
+and continue the transformations over to the parents (parent references).
 
-・回転量(クォータニオン)の計算
-[親付与回転量(or 親回転 * 親回転モーフ) * 付与親のIKリンク]:付与率 * 回転 * 回転モーフ * IKリンク
+
+
+□Local transformation order
+
+・Rotation(quaternion) calculation
+[Allowed Parent rotation amount (or parent rotation * parent rotation morph) * Allowed Parent's IK links]:allowedAmount * Rotation * Rotation Morph * IK Links
 --
-計算例:
+Calculation Example:
 0. 回転量を単位回転量として開始
 
 1. 当該ボーンが付与の場合 : 
@@ -190,38 +190,38 @@ Z' = Vector3.Cross(X, Y);
 ※ただし、これらの機構を接続するための外部仕様が非常にややこしいので、実現の可能性は低いと思われる。
 
 
-□ボーンの属性(フラグ値)について
+□About Bone characteristics/attributes (Flag Bits)
 
- 0x0001  : 接続先
- 0x0002  : 回転可能
- 0x0004  : 移動可能
- 0x0008  : 表示
- 0x0010  : 操作可
+ 0x0001  : connectionDisplayMethod
+ 0x0002  : rotationPossible
+ 0x0004  : movementPossible
+ 0x0008  : show
+ 0x0010  : controlPossible
  0x0020  : IK
- 0x0100  : 回転付与
- 0x0200  : 移動付与
- 0x0400  : 軸固定
- 0x0800  : ローカル軸
- 0x1000  : 物理後変形
- 0x2000  : 外部親変形
+ 0x0100  : giveRotation
+ 0x0200  : giveTranslation
+ 0x0400  : axisFixed
+ 0x0800  : localAxis
+ 0x1000  : transformAfterPhysics
+ 0x2000  : externalParentTransform
 
-とあるが、この中でボーンの変形特性に係わる属性は
+The Bone Bitflag has these attributes, but within these the only ones that concern transformation characteristics:
 
  0x0020  : IK
- 0x0100  : 回転付与
- 0x0200  : 移動付与
- 0x1000  : 物理後変形
- 0x2000  : 外部親変形
+ 0x0100  : giveRotation
+ 0x0200  : giveTranslation
+ 0x1000  : transformAfterPhysics
+ 0x2000  : externalParentTransform
 
-のみで、残りの
+only these are concerned with transformation attributes/characterstics. The rest:
 
- 0x0001  : 接続先
- 0x0002  : 回転可能
- 0x0004  : 移動可能
- 0x0008  : 表示
- 0x0010  : 操作可
- 0x0400  : 軸固定
- 0x0800  : ローカル軸
+ 0x0001  : connectionDisplayMethod
+ 0x0002  : rotationPossible
+ 0x0004  : movementPossible
+ 0x0008  : show
+ 0x0010  : controlPossible
+ 0x0400  : axisFixed
+ 0x0800  : localAxis
 
-は、表示及び操作時の制限項目になる。
-ボーンの変形特性や内部値には関与しないので注意。
+are restrictions used when displaying/controlling bones.
+They don't affect transformation characteristics/attributes so be warned.

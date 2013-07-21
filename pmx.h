@@ -98,8 +98,8 @@ struct PMXBone
 	/*Notes concerning PMXBones:
 	 * When a given bone is translated/rotated, all of its children are translated/rotated
 	 * 
-	 * When Rotation/Movement allowed is turned on, the bone's allowedParentBone's movement/rotation values get added like so:
-	 * allowedParentBone(x,y,z) -> thisBone(+allowRate*x, +allowRate*y, +allowRate*z)
+	 * When Rotation/Movement allowed is turned on, the bone's givenParentBone's movement/rotation values get added like so:
+	 * givenParentBone(x,y,z) -> thisBone(+allowRate*x, +allowRate*y, +allowRate*z)
 	 * (Depending on the allowRate value, negative values also become possible)
 	 * 
 	 * */
@@ -120,8 +120,8 @@ struct PMXBone
 	bool controlPossible;
 	bool IK; //USED IN TRANSFORMATIONS
 	
-	bool rotationAllowed; //USED IN TRANSFORMATIONS
-	bool movementAllowed; //USED IN TRANSFORMATIONS
+	bool giveRotation; //USED IN TRANSFORMATIONS
+	bool giveTranslation; //USED IN TRANSFORMATIONS
 	bool axisFixed;
 	bool localAxis;
 	bool transformAfterPhysics; //USED IN TRANSFORMATIONS; used as part of determining order in which transformations are applied
@@ -134,8 +134,8 @@ struct PMXBone
 	unsigned int connectionBoneIndex;
 	
 	//If rotationAllowed==1 or movementAllowed==1
-	unsigned int allowedParentBoneIndex;
-	float allowRate;
+	unsigned int givenParentBoneIndex;
+	float giveRate;
 	
 	//If axisFixed==1
 	glm::vec3 axisDirectionVector;

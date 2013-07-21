@@ -245,8 +245,8 @@ void printDebugInfo()
 		cerr<<"Control Possible: "<<bone->controlPossible<<endl;
 		cerr<<"IK: "<<bone->IK<<endl;
 		
-		cerr<<"Rotation Allowed: "<<bone->rotationAllowed<<endl;
-		cerr<<"Movement Allowed: "<<bone->movementAllowed<<endl;
+		cerr<<"Rotation Allowed: "<<bone->giveRotation<<endl;
+		cerr<<"Movement Allowed: "<<bone->giveTranslation<<endl;
 		cerr<<"Axis Fixed: "<<bone->axisFixed<<endl;
 		cerr<<"Local Axis: "<<bone->localAxis<<endl;
 		cerr<<"Transform After Physics: "<<bone->transformAfterPhysics<<endl;
@@ -261,10 +261,10 @@ void printDebugInfo()
 			cerr<<"Connection Bone Index: "<<bone->connectionBoneIndex<<endl;
 		}
 		
-		if(bone->rotationAllowed || bone->movementAllowed)
+		if(bone->giveRotation || bone->giveTranslation)
 		{
-			cerr<<"Allowed Parent Bone Index: "<<bone->allowedParentBoneIndex<<endl;
-			cerr<<"Allowed Rate: "<<bone->allowRate<<endl;
+			cerr<<"Allowed Parent Bone Index: "<<bone->givenParentBoneIndex<<endl;
+			cerr<<"Allowed Rate: "<<bone->giveRate<<endl;
 		}
 		
 		if(bone->axisFixed)
@@ -712,8 +712,8 @@ void readPMX()
 		miku.read(bitflag_char,1);
 		bitset<8> bitflag2(*bitflag_char);
 	
-		bone->rotationAllowed=bitflag2[0];
-		bone->movementAllowed=bitflag2[1];
+		bone->giveRotation=bitflag2[0];
+		bone->giveTranslation=bitflag2[1];
 		bone->axisFixed=bitflag2[2];
 		bone->localAxis=bitflag2[3];
 		bone->transformAfterPhysics=bitflag2[4];
@@ -730,10 +730,10 @@ void readPMX()
 			miku.read((char*)&bone->connectionBoneIndex,(int)pmxInfo.boneIndexSize);
 		}
 		
-		if(bone->rotationAllowed || bone->movementAllowed)
+		if(bone->giveRotation || bone->giveTranslation)
 		{
-			miku.read((char*)&bone->allowedParentBoneIndex,(int)pmxInfo.boneIndexSize);
-			miku.read((char*)&bone->allowRate,4);
+			miku.read((char*)&bone->givenParentBoneIndex,(int)pmxInfo.boneIndexSize);
+			miku.read((char*)&bone->giveRate,4);
 		}
 		
 		if(bone->axisFixed)
