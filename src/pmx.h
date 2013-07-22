@@ -3,6 +3,11 @@
 
 #include <vector>
 #include <string>
+#include <fstream>
+
+#include <glm/gtc/matrix_transform.hpp> 
+#include <glm/gtx/transform.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 #define WEIGHT_FORMULA_BDEF1 0
 #define WEIGHT_FORMULA_BDEF2 1
@@ -18,6 +23,26 @@
 #define MORPH_TYPE_EXTRA_UV3 6
 #define MORPH_TYPE_EXTRA_UV4 7
 #define MORPH_TYPE_MATERIAL 8
+
+#define VERTEX_DEBUG false
+#define MATERIAL_DEBUG true
+
+
+struct PMXBone;
+struct PMXInfo;
+
+//PMX related Functions
+PMXBone *getChildBone(unsigned &id, PMXBone *parentBone);
+PMXBone *getChildBone(std::string &name, PMXBone *parentBone);
+int getBone(PMXInfo &pmxInfo, std::string &name);
+
+void getPMXText(std::ifstream &miku, PMXInfo &pmxInfo, std::string &result, bool debug=false);
+PMXInfo &readPMX(std::string filename);
+
+#define PMX_ENCODE_UTF16 0
+#define PMX_ENCODE_UTF8 1
+
+//PMX related structs
 
 struct PMXVertex
 {	

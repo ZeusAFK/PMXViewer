@@ -1,6 +1,22 @@
 #ifndef VMD_H
 #define VMD_H
 
+#include <vector>
+#include <string>
+#include <fstream>
+
+#include <glm/gtc/matrix_transform.hpp> 
+#include <glm/gtx/transform.hpp>
+#include <glm/gtx/quaternion.hpp>
+
+struct VMDInfo;
+
+//VMD related functions
+
+VMDInfo &readVMD();
+
+//VMD related structs
+
 struct BoneFrame
 {
 	std::string name; //char[15] before UTF8 conversion
