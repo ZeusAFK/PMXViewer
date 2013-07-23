@@ -63,7 +63,7 @@ VMDInfo &readVMD()
 		cout<<"Frame Number: "<<f->frame<<endl<<endl;
 		
 		cout<<"Position: "<<f->position.x<<" "<<f->position.y<<" "<<f->position.z<<endl;
-		cout<<"Quaternion: "<<f->quaternion.x<<" "<<f->quaternion.y<<" "<<f->quaternion.z<<endl;*/
+		cout<<"Quaternion: "<<f->quaternion.x<<" "<<f->quaternion.y<<" "<<f->quaternion.z<<" "<<f->quaternion.w<<endl;*/
 	}
 	cout<<"done."<<endl;
 	

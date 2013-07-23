@@ -543,6 +543,10 @@ PMXInfo &readPMX(string filename)
 			//cout<<bone->
 		}
 		
+		bone->relativeForm[3][0]=bone->position.x;
+		bone->relativeForm[3][1]=bone->position.y;
+		bone->relativeForm[3][2]=bone->position.z;
+		
 		pmxInfo.bones.push_back(bone);
 	}
 	cout<<"done."<<endl;

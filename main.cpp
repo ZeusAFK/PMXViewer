@@ -200,7 +200,7 @@ glm::mat4 setBoneToFrame(PMXBone *b, BoneFrame &bf)
 	
 	glm::mat4 invAniMatrix=glm::inverse(aniMatrix);
 	
-	glm::mat4 L=aniMatrix; //setBoneToFrame(pmxInfo.bones[bone->parentBoneIndex],bf);
+	glm::mat4 L=glm::inverse(b->relativeForm)*aniMatrix; //setBoneToFrame(pmxInfo.bones[bone->parentBoneIndex],bf);
 	
 	/*L[0][3]=-b->position.x;
 	L[1][3]=-b->position.y;
@@ -217,7 +217,7 @@ glm::mat4 setBoneToFrame(PMXBone *b, BoneFrame &bf)
 	{
 		glm::mat4 result=L; //setBoneToFrame(pmxInfo.bones[b->parentBoneIndex],bf)*
 	
-		//cout<<"Result:"<<endl;
+		cout<<"aniMatrix:"<<endl;
 		cout<<result[0][0]<<" "<<result[0][1]<<" "<<result[0][2]<<" "<<result[0][3]<<endl
 		<<result[1][0]<<" "<<result[1][1]<<" "<<result[1][2]<<" "<<result[1][3]<<endl
 		<<result[2][0]<<" "<<result[2][1]<<" "<<result[2][2]<<" "<<result[2][3]<<endl
@@ -265,10 +265,27 @@ void setModelToKeyFrame(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInf
 	glm::mat4 bindPose[pmxInfo.bone_continuing_datasets];
 	glm::mat4 invBindPose[pmxInfo.bone_continuing_datasets];
 	
-	glm::mat4 skinMatrix[pmxInfo.bone_continuing_datasets];
-	//for(size_t i=0; i<pmxInfo.bone_continuing_datasets; i++)
+	for(int i=0; i<pmxInfo.bone_continuing_datasets; ++i)
 	{
-		int i=32;
+		PMXBone *b = pmxInfo.bones[i];
+		
+		if(b->parentBoneIndex==-1)
+		{
+			b->absoluteForm = b->relativeForm;
+		}
+		else
+		{
+			b->absoluteForm = pmxInfo.bones[b->parentBoneIndex]->absoluteForm * b->relativeForm;
+		}
+		
+		bindPose[i] = (pmxInfo.bones[i]->absoluteForm);
+		invBindPose[i] = glm::inverse(bindPose[i]);
+	}
+	
+	glm::mat4 skinMatrix[pmxInfo.bone_continuing_datasets];
+	for(size_t i=0; i<pmxInfo.bone_continuing_datasets; i++)
+	{
+		//int i=32;
 		PMXBone *b = pmxInfo.bones[i];
 		
 		BoneFrame *bf=getBoneFrame(targetFrame,b->name);
@@ -290,8 +307,21 @@ void setModelToKeyFrame(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInf
 				aniMatrix[3][2]=bf->position.z;
 		
 				glm::mat4 invAniMatrix=glm::inverse(aniMatrix);
-				b->absoluteForm = pmxInfo.bones[b->parentBoneIndex]->absoluteForm * (setBoneToFrame(b,*bf));
+				b->absoluteForm = pmxInfo.bones[b->parentBoneIndex]->absoluteForm * (b->relativeForm*aniMatrix);
 				//b->absoluteForm = 
+				//b->absoluteForm = pmxInfo.bones[b->parentBoneIndex]->absoluteForm * b->relativeForm;
+				
+				cout<<"relativeForm: "<<endl;
+				cout<<b->relativeForm[0][0]<<" "<<b->relativeForm[0][1]<<" "<<b->relativeForm[0][2]<<" "<<b->relativeForm[0][3]<<endl
+				<<b->relativeForm[1][0]<<" "<<b->relativeForm[1][1]<<" "<<b->relativeForm[1][2]<<" "<<b->relativeForm[1][3]<<endl
+				<<b->relativeForm[2][0]<<" "<<b->relativeForm[2][1]<<" "<<b->relativeForm[2][2]<<" "<<b->relativeForm[2][3]<<endl
+				<<b->relativeForm[3][0]<<" "<<b->relativeForm[3][1]<<" "<<b->relativeForm[3][2]<<" "<<b->relativeForm[3][3]<<endl<<endl;
+				
+				cout<<"absoluteForm: "<<endl;
+				cout<<b->absoluteForm[0][0]<<" "<<b->absoluteForm[0][1]<<" "<<b->absoluteForm[0][2]<<" "<<b->absoluteForm[0][3]<<endl
+				<<b->absoluteForm[1][0]<<" "<<b->absoluteForm[1][1]<<" "<<b->absoluteForm[1][2]<<" "<<b->absoluteForm[1][3]<<endl
+				<<b->absoluteForm[2][0]<<" "<<b->absoluteForm[2][1]<<" "<<b->absoluteForm[2][2]<<" "<<b->absoluteForm[2][3]<<endl
+				<<b->absoluteForm[3][0]<<" "<<b->absoluteForm[3][1]<<" "<<b->absoluteForm[3][2]<<" "<<b->absoluteForm[3][3]<<endl<<endl;
 			}
 			else
 			{
@@ -302,10 +332,11 @@ void setModelToKeyFrame(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInf
 		//bindPose[i] = (pmxInfo.bones[i]->absoluteForm);
 		//invBindPose[i] = glm::inverse(bindPose[i]);
 		
-		/*cout<<invBindPose[i][0][0]<<" "<<invBindPose[i][0][1]<<" "<<invBindPose[i][0][2]<<" "<<invBindPose[i][0][3]<<endl
+		cout<<"invBindPose: "<<endl;
+		cout<<invBindPose[i][0][0]<<" "<<invBindPose[i][0][1]<<" "<<invBindPose[i][0][2]<<" "<<invBindPose[i][0][3]<<endl
 		<<invBindPose[i][1][0]<<" "<<invBindPose[i][1][1]<<" "<<invBindPose[i][1][2]<<" "<<invBindPose[i][1][3]<<endl
 		<<invBindPose[i][2][0]<<" "<<invBindPose[i][2][1]<<" "<<invBindPose[i][2][2]<<" "<<invBindPose[i][2][3]<<endl
-		<<invBindPose[i][3][0]<<" "<<invBindPose[i][3][1]<<" "<<invBindPose[i][3][2]<<" "<<invBindPose[i][3][3]<<endl<<endl;*/
+		<<invBindPose[i][3][0]<<" "<<invBindPose[i][3][1]<<" "<<invBindPose[i][3][2]<<" "<<invBindPose[i][3][3]<<endl<<endl;
 		
 		if(bf!=NULL)
 		{
