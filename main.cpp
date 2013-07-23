@@ -10,6 +10,7 @@
 #include "SOIL/SOIL.h"
 
 #include <glm/gtc/matrix_transform.hpp> 
+#include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 
@@ -130,11 +131,13 @@ void loadTextures(PMXInfo &pmxInfo)
 }
 
 
-void quaternionToMat4(glm::mat4 &m, glm::vec3 &p, glm::vec4 &q)
+void quaternionToMat4(glm::mat4 &m, glm::vec3 &p, glm::quat &q)
 {
-	m[0][3] = p[0];
-	m[1][3] = p[1];
-	m[2][3] = p[2];
+	//cout<<"Vector: "<<p[0]<<" "<<p[1]<<" "<<p[2]<<endl;
+	
+	m[3][0] = p[0];
+	m[3][1] = p[1];
+	m[3][2] = p[2];
 	
 	float x2 = q[0] + q[0];
 	float y2 = q[1] + q[1];
@@ -151,26 +154,34 @@ void quaternionToMat4(glm::mat4 &m, glm::vec3 &p, glm::vec4 &q)
 	{
 		float yz2 = q[1] * z2;
 		float wx2 = q[3] * x2;
-		m[2][1] = yz2 - wx2;
-		m[1][2] = yz2 + wx2;
+		m[1][2] = yz2 - wx2;
+		m[2][1] = yz2 + wx2;
 	}
 	{
 		float xy2 = q[0] * y2;
 		float wz2 = q[3] * z2;
-		m[1][0] = xy2 - wz2;
-		m[0][1] = xy2 + wz2;
+		m[0][1] = xy2 - wz2;
+		m[1][0] = xy2 + wz2;
 	}
 	{
 		float xz2 = q[0] * z2;
 		float wy2 = q[3] * y2;
-		m[0][2] = xz2 - wy2;
-		m[2][0] = xz2 + wy2;
+		m[2][0] = xz2 - wy2;
+		m[0][2] = xz2 + wy2;
 	}
+	
+	/*cout<<"Quat Matrix:"<<endl;
+	cout<<m[0][0]<<" "<<m[0][1]<<" "<<m[0][2]<<" "<<m[0][3]<<endl
+	<<m[1][0]<<" "<<m[1][1]<<" "<<m[1][2]<<" "<<m[1][3]<<endl
+	<<m[2][0]<<" "<<m[2][1]<<" "<<m[2][2]<<" "<<m[2][3]<<endl
+	<<m[3][0]<<" "<<m[3][1]<<" "<<m[3][2]<<" "<<m[3][3]<<endl<<endl;*/
+	
 }
 
 
-void setBoneToFrame(PMXBone *bone, BoneFrame &bf)
+glm::mat4 setBoneToFrame(PMXBone *b, BoneFrame &bf)
 {
+	//glm::mat4 invBindPose=glm::inverse(bindPose);
 	//*****************LOOK HERE*****************/
 	
 	/*digited: This is where I'm really having trouble.
@@ -181,29 +192,67 @@ void setBoneToFrame(PMXBone *bone, BoneFrame &bf)
 	This code is a big mess at the moment; I'm well aware, my plan was to spend time cleaning up after I got animation working.
 	In particular pmxInfo and vmdInfo are used liberally as global variables in many functions (while others properly require it as a function argument)*/
 	
-	/*cout<<"Refreshing relative position matrix for: "<<bone->name<<endl;
+	
+	cout<<"Refreshing relative position matrix for: "<<b->name<<endl;
 	cout<<bf.position.x<<" "<<bf.position.y<<" "<<bf.position.z<<endl;
 	cout<<bf.quaternion.x<<" "<<bf.quaternion.y<<" "<<bf.quaternion.z<<" "<<bf.quaternion.w<<endl<<endl;
 				
-	glm::mat4 boneMatrix;
-	quaternionToMat4(boneMatrix,bf.position,bf.quaternion);
+	glm::mat4 aniMatrix=glm::toMat4(bf.quaternion);
+	glm::mat4 invAniMatrix=glm::inverse(aniMatrix);
+	/*aniMatrix[3][0]=b->position.x;
+	aniMatrix[3][1]=b->position.y;
+	aniMatrix[3][2]=b->position.z;*/
 	
-	glm::mat4 invBoneMatrix=glm::inverse(boneMatrix);
+	/*aniMatrix[3][0]=-b->position.x;
+	aniMatrix[3][1]=-b->position.y;
+	aniMatrix[3][2]=-b->position.z;*/
 	
-	glm::mat4 result=invBoneMatrix*bone->relativeForm;
+	glm::mat4 translateMatrix=glm::translate(b->position.x,b->position.y,b->position.z);
+	glm::mat4 inverseTranslate=glm::inverse(translateMatrix);
 	
-	bone->relativeForm=result;
-	
-	if(bone->parentBoneIndex==255)
-	{
+	glm::mat4 invRelativeForm=glm::inverse(b->relativeForm);
 		
+	glm::mat4 L=b->relativeForm*aniMatrix; //setBoneToFrame(pmxInfo.bones[bone->parentBoneIndex],bf);
+	
+	/*L[0][3]=-b->position.x;
+	L[1][3]=-b->position.y;
+	L[2][3]=-b->position.z;*/
+	
+	
+	if(b->parentBoneIndex==-1)
+	{
+		b->relativeForm=L;
+		
+		return L;
 	}
 	else
 	{
+		glm::mat4 result=L; //setBoneToFrame(pmxInfo.bones[b->parentBoneIndex],bf)*
+	
+		//cout<<"Result:"<<endl;
+		cout<<result[0][0]<<" "<<result[0][1]<<" "<<result[0][2]<<" "<<result[0][3]<<endl
+		<<result[1][0]<<" "<<result[1][1]<<" "<<result[1][2]<<" "<<result[1][3]<<endl
+		<<result[2][0]<<" "<<result[2][1]<<" "<<result[2][2]<<" "<<result[2][3]<<endl
+		<<result[3][0]<<" "<<result[3][1]<<" "<<result[3][2]<<" "<<result[3][3]<<endl<<endl;
 		
-		
-		setBoneToFrame(pmxInfo.bones[bone->parentBoneIndex],bf);
-	}*/
+		b->relativeForm=result;
+	
+		return result;
+	
+		//bone->relativeForm=result;
+	}
+}
+
+BoneFrame *getBoneFrame(int frame, string boneName)
+{
+	for(int i=0; i<vmdInfo.boneCount; ++i)
+	{
+		if(vmdInfo.boneFrames[i].name==boneName && vmdInfo.boneFrames[i].frame==frame) return &vmdInfo.boneFrames[i];
+	}
+	
+	//cerr<<"No bone found: "<<boneName<<endl;
+	
+	return NULL;
 }
 
 void setModelToKeyFrame(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInfo, VMDInfo &vmdInfo)
@@ -235,7 +284,8 @@ void setModelToKeyFrame(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInf
 		b->relativeForm[2]=glm::vec4(0,0,1,0);
 		b->relativeForm[3]=glm::vec4(b->position.x,b->position.y,b->position.z,1);
 		
-		if(b->parentBoneIndex==255)
+		//cout<<b->parentBoneIndex<<endl;
+		if(b->parentBoneIndex==-1)
 		{
 			b->absoluteForm = b->relativeForm;
 		}
@@ -250,42 +300,40 @@ void setModelToKeyFrame(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInf
 		//Bone[i] = b->absoluteForm*invBindPose[i];
 	}
 	
-	for(int i=0; i<vmdInfo.boneCount; ++i)
+	glm::mat4 skinMatrix[pmxInfo.bone_continuing_datasets];
+	//for(size_t i=0; i<pmxInfo.bone_continuing_datasets; i++)
 	{
-		//int i=1;
-		BoneFrame &bf=vmdInfo.boneFrames[i];
-		
-		if(bf.frame==targetFrame)
-		{
-			PMXBone *b=getChildBone(bf.name,parentBone);
-			
-			if(b)
-			{				
-				setBoneToFrame(b,bf);
-			}
-			else
-			{
-				//cerr<<"Warning: No matching bone found for frame: "<<bf.name<<endl;
-			}
-		}
-	}
-	
-	for(size_t i=0; i<pmxInfo.bone_continuing_datasets; i++)
-	{
+		int i=32;
 		PMXBone *b = pmxInfo.bones[i];
 		
-		/*b->relativeForm[0]=glm::vec4(1,0,0,0);
-		b->relativeForm[1]=glm::vec4(0,1,0,0);
-		b->relativeForm[2]=glm::vec4(0,0,1,0);
-		b->relativeForm[3]=glm::vec4(b->position.x,b->position.y,b->position.z,1);*/
+		BoneFrame *bf=getBoneFrame(targetFrame,b->name);
+		if(bf!=NULL)
+		{
+			setBoneToFrame(b,*bf);
+		}
+		else
+		{
+			
+		}
 		
-		if(b->parentBoneIndex==255)
+		if(b->parentBoneIndex==-1)
 		{
 			b->absoluteForm = b->relativeForm;
 		}
 		else
 		{
-			b->absoluteForm = pmxInfo.bones[b->parentBoneIndex]->absoluteForm * b->relativeForm;
+			
+			BoneFrame *bf=getBoneFrame(targetFrame,b->name);
+			if(bf!=NULL)
+			{
+				b->absoluteForm = pmxInfo.bones[b->parentBoneIndex]->absoluteForm * (b->relativeForm);
+				
+				
+			}
+			else
+			{
+				b->absoluteForm = pmxInfo.bones[b->parentBoneIndex]->absoluteForm * b->relativeForm;
+			}
 		}
 		
 		//bindPose[i] = (pmxInfo.bones[i]->absoluteForm);
@@ -296,23 +344,14 @@ void setModelToKeyFrame(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInf
 		<<invBindPose[i][2][0]<<" "<<invBindPose[i][2][1]<<" "<<invBindPose[i][2][2]<<" "<<invBindPose[i][2][3]<<endl
 		<<invBindPose[i][3][0]<<" "<<invBindPose[i][3][1]<<" "<<invBindPose[i][3][2]<<" "<<invBindPose[i][3][3]<<endl<<endl;*/
 		
-		Bone[i] = b->absoluteForm*invBindPose[i];
+		Bone[i] = invBindPose[i] * b->absoluteForm;
+		
+		cout<<"Final Bone: "<<endl;
+		cout<<Bone[i][0][0]<<" "<<Bone[i][0][1]<<" "<<Bone[i][0][2]<<" "<<Bone[i][0][3]<<endl
+		<<Bone[i][1][0]<<" "<<Bone[i][1][1]<<" "<<Bone[i][1][2]<<" "<<Bone[i][1][3]<<endl
+		<<Bone[i][2][0]<<" "<<Bone[i][2][1]<<" "<<Bone[i][2][2]<<" "<<Bone[i][2][3]<<endl
+		<<Bone[i][3][0]<<" "<<Bone[i][3][1]<<" "<<Bone[i][3][2]<<" "<<Bone[i][3][3]<<endl<<endl;
 	}
-	
-	
-	/*for(unsigned i=0; i<pmxInfo.bone_continuing_datasets; ++i)
-	{
-		PMXBone *bone=getChildBone(i,parentBone);
-		//cout<<bone->name<<endl;
-		
-		glm::vec3 position;
-		glm::vec4 blankQuaternion;
-		
-		
-		glm::mat4 boneMatrix;
-		quaternionToMat4(boneMatrix,position,blankQuaternion);
-		Bone[i]=boneMatrix;
-	}*/
 	
 	GLuint Bones_loc=glGetUniformLocation(shaderProgram,"Bones");
 	glUniformMatrix4fv(Bones_loc, pmxInfo.bone_continuing_datasets, GL_FALSE, &Bone[0][0][0]);
@@ -370,11 +409,11 @@ void init(PMXInfo &pmxInfo, VMDInfo &vmdInfo)
 		
 		//cout<<pmxInfo.vertices[i]->boneIndex1<<" "<<pmxInfo.vertices[i]->pos[1]<<" "<<pmxInfo.bones[pmxInfo.vertices[i]->boneIndex1]->position.y<<endl;
 		
-		if(pmxInfo.vertices[i]->weight_transform_formula==3)
+		/*if(pmxInfo.vertices[i]->weight_transform_formula==3)
 		{
 			cerr<<"SDEF not supported yet"<<endl;
 			exit(EXIT_FAILURE);
-		}
+		}*/
 		
 		//cout<<pmxInfo.vertices[i]->weight1<<" "<<pmxInfo.vertices[i]->weight2<<" "<<pmxInfo.vertices[i]->weight3<<" "<<pmxInfo.vertices[i]->weight4<<endl;
 		

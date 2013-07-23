@@ -134,7 +134,7 @@ struct PMXBone
 	
 	glm::vec3 position;
 	
-	unsigned parentBoneIndex; //Set to -1 (65535) when unused
+	int parentBoneIndex; //Set to -1 when unused
 	
 	int transformationLevel; //used as part of determining order in which transformations are applied
 	
@@ -182,8 +182,6 @@ struct PMXBone
 	
 	
 	//VARIABLES I ADDED BELOW THIS POINT
-	unsigned int id; //the ID of this bone
-	std::vector<PMXBone*> children;
 	
 	glm::mat4 relativeForm,absoluteForm;
 };

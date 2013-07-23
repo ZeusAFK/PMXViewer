@@ -48,6 +48,8 @@ VMDInfo &readVMD()
 		miku.read((char*)&f->position.y,4);
 		miku.read((char*)&f->position.z,4);
 		
+		//cout<<f->position.x<<" "<<f->position.y<<" "<<f->position.z<<endl;
+		
 		miku.read((char*)&f->quaternion.x,4);
 		miku.read((char*)&f->quaternion.y,4);
 		miku.read((char*)&f->quaternion.z,4);

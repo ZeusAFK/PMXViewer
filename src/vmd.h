@@ -8,6 +8,7 @@
 #include <glm/gtc/matrix_transform.hpp> 
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 struct VMDInfo;
 
@@ -24,7 +25,7 @@ struct BoneFrame
 	unsigned int frame;
 	
 	glm::vec3 position; //values will be 0 when there's no position
-	glm::vec4 quaternion; //values will be 0 when there's no position (w will be 1.0)
+	glm::quat quaternion; //values will be 0 when there's no position (w will be 1.0)
 	
 	std::string interpolationParameters; //char[64] before UTF8 conversion
 };

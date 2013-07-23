@@ -54,9 +54,9 @@ void getPMXText(ifstream &miku, PMXInfo &pmxInfo, string &result, bool debug)
 	}
 }
 
-PMXBone *getChildBone(unsigned &id, PMXBone *parentBone)
+/*PMXBone *getChildBone(int &id, PMXBone *parentBone)
 {
-	if(id==0) return parentBone;
+	if(id==-1) return parentBone;
 	for(int i=0; i<parentBone->children.size(); ++i)
 	{
 		//cout<<"Searching child "<<i<<endl;
@@ -75,8 +75,7 @@ PMXBone *getChildBone(unsigned &id, PMXBone *parentBone)
 			}
 		}
 	}
-	//cerr<<"FATAL ERROR: Bone could not be found: "<<id<<endl;
-	//exit(EXIT_FAILURE);
+
 	return NULL;
 }
 
@@ -104,7 +103,7 @@ PMXBone *getChildBone(string &name, PMXBone *parentBone)
 	//cerr<<"FATAL ERROR: Bone could not be found: "<<id<<endl;
 	//exit(EXIT_FAILURE);
 	return NULL;
-}
+}*/
 
 int getBone(PMXInfo &pmxInfo, string &name)
 {
@@ -424,7 +423,16 @@ PMXInfo &readPMX(string filename)
 		miku.read((char*)&bone->position.z,4);
 		
 		//***Pull Parent Index***
-		miku.read((char*)&bone->parentBoneIndex,(int)pmxInfo.boneIndexSize);
+		char *tmpBoneIndex=(char*) malloc(pmxInfo.boneIndexSize);
+		miku.read(tmpBoneIndex,(int)pmxInfo.boneIndexSize);
+		
+		bone->parentBoneIndex=(int)*tmpBoneIndex;
+		
+		/*cout<<(int)*tmpBoneIndex<<endl;
+		cout<<"PBI: "<<bone->parentBoneIndex<<endl;*/
+		
+		//exit(EXIT_SUCCESS);
+		
 		
 		//***Pull Transformation Level***/
 		miku.read((char*)&bone->transformationLevel,4);
@@ -529,38 +537,16 @@ PMXInfo &readPMX(string filename)
 			}
 		}
 		
+		//if(bone->parentBoneIndex==-128)
+		{
+			//cout<<bone->name<<endl;
+			//cout<<bone->
+		}
 		
 		pmxInfo.bones.push_back(bone);
-		
-		bone->id=i;
-		//cout<<bone->parentBoneIndex<<endl;
-		if(bone->parentBoneIndex!=255 && bone->parentBoneIndex!=0)
-		{
-			//recursively search through all children
-			//cout<<"recursive search"<<endl;
-			PMXBone *parentBone=getChildBone(bone->parentBoneIndex,pmxInfo.parentBone);
-			if(parentBone==NULL)
-			{
-				cerr<<"FATAL ERROR: parent Bone not found: "<<bone->parentBoneIndex<<endl;
-				exit(EXIT_FAILURE);
-			}
-			parentBone->children.push_back(bone);
-			//exit(EXIT_SUCCESS);
-		}
-		else if(bone->parentBoneIndex==255)
-		{
-			pmxInfo.parentBone=bone;
-		}
-		else //parentBoneIndex==0
-		{
-			//cout<<"pushing back directly into parent"<<endl;
-			pmxInfo.parentBone->children.push_back(bone);
-		}
 	}
 	cout<<"done."<<endl;
-	
-	//printBoneHierarchy(pmxInfo.parentBone);
-	
+		
 	//***Pull Morph Info***
 	miku.read((char*)&pmxInfo.morph_continuing_datasets,4);
 	cout<<"Morph Continuing Datasets: "<<pmxInfo.morph_continuing_datasets<<endl;
