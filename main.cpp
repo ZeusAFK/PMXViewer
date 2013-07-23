@@ -184,35 +184,23 @@ glm::mat4 setBoneToFrame(PMXBone *b, BoneFrame &bf)
 	//glm::mat4 invBindPose=glm::inverse(bindPose);
 	//*****************LOOK HERE*****************/
 	
-	/*digited: This is where I'm really having trouble.
-	I need to figure out how to transform the bones by an Animation matrix (which I must construct from a position+quaternion) without causing issues.
-	The main functions you'll probably want to look at are setBoneToFrame() and setModelToKeyFrame().
-	Look at pmx.h, vmd.h for information concerning the PMX and VMD file formats
-	
-	This code is a big mess at the moment; I'm well aware, my plan was to spend time cleaning up after I got animation working.
-	In particular pmxInfo and vmdInfo are used liberally as global variables in many functions (while others properly require it as a function argument)*/
-	
 	
 	cout<<"Refreshing relative position matrix for: "<<b->name<<endl;
 	cout<<bf.position.x<<" "<<bf.position.y<<" "<<bf.position.z<<endl;
 	cout<<bf.quaternion.x<<" "<<bf.quaternion.y<<" "<<bf.quaternion.z<<" "<<bf.quaternion.w<<endl<<endl;
 				
 	glm::mat4 aniMatrix=glm::toMat4(bf.quaternion);
+	aniMatrix[3][0]=bf.position.x;
+	aniMatrix[3][1]=bf.position.y;
+	aniMatrix[3][2]=bf.position.z;
+	
+	/*aniMatrix[0][3]=b->position.x;
+	aniMatrix[1][3]=b->position.y;
+	aniMatrix[2][3]=b->position.z;*/
+	
 	glm::mat4 invAniMatrix=glm::inverse(aniMatrix);
-	/*aniMatrix[3][0]=b->position.x;
-	aniMatrix[3][1]=b->position.y;
-	aniMatrix[3][2]=b->position.z;*/
 	
-	/*aniMatrix[3][0]=-b->position.x;
-	aniMatrix[3][1]=-b->position.y;
-	aniMatrix[3][2]=-b->position.z;*/
-	
-	glm::mat4 translateMatrix=glm::translate(b->position.x,b->position.y,b->position.z);
-	glm::mat4 inverseTranslate=glm::inverse(translateMatrix);
-	
-	glm::mat4 invRelativeForm=glm::inverse(b->relativeForm);
-		
-	glm::mat4 L=b->relativeForm*aniMatrix; //setBoneToFrame(pmxInfo.bones[bone->parentBoneIndex],bf);
+	glm::mat4 L=aniMatrix; //setBoneToFrame(pmxInfo.bones[bone->parentBoneIndex],bf);
 	
 	/*L[0][3]=-b->position.x;
 	L[1][3]=-b->position.y;
@@ -235,7 +223,7 @@ glm::mat4 setBoneToFrame(PMXBone *b, BoneFrame &bf)
 		<<result[2][0]<<" "<<result[2][1]<<" "<<result[2][2]<<" "<<result[2][3]<<endl
 		<<result[3][0]<<" "<<result[3][1]<<" "<<result[3][2]<<" "<<result[3][3]<<endl<<endl;
 		
-		b->relativeForm=result;
+		b->relativeForm=L;
 	
 		return result;
 	
@@ -257,6 +245,8 @@ BoneFrame *getBoneFrame(int frame, string boneName)
 
 void setModelToKeyFrame(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInfo, VMDInfo &vmdInfo)
 {
+	//*****************LOOK HERE*****************/
+	
 	cout<<"START BONE READ"<<endl;
 	
 	cout<<"Bone vector size: "<<pmxInfo.bone_continuing_datasets<<endl;
@@ -274,31 +264,6 @@ void setModelToKeyFrame(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInf
 
 	glm::mat4 bindPose[pmxInfo.bone_continuing_datasets];
 	glm::mat4 invBindPose[pmxInfo.bone_continuing_datasets];
-
-	for(size_t i=0; i<pmxInfo.bone_continuing_datasets; i++)
-	{
-		PMXBone *b = pmxInfo.bones[i];
-		
-		b->relativeForm[0]=glm::vec4(1,0,0,0);
-		b->relativeForm[1]=glm::vec4(0,1,0,0);
-		b->relativeForm[2]=glm::vec4(0,0,1,0);
-		b->relativeForm[3]=glm::vec4(b->position.x,b->position.y,b->position.z,1);
-		
-		//cout<<b->parentBoneIndex<<endl;
-		if(b->parentBoneIndex==-1)
-		{
-			b->absoluteForm = b->relativeForm;
-		}
-		else
-		{
-			b->absoluteForm = pmxInfo.bones[b->parentBoneIndex]->absoluteForm * b->relativeForm;
-		}
-		
-		bindPose[i] = (pmxInfo.bones[i]->absoluteForm);
-		invBindPose[i] = glm::inverse(bindPose[i]);
-		
-		//Bone[i] = b->absoluteForm*invBindPose[i];
-	}
 	
 	glm::mat4 skinMatrix[pmxInfo.bone_continuing_datasets];
 	//for(size_t i=0; i<pmxInfo.bone_continuing_datasets; i++)
@@ -307,14 +272,6 @@ void setModelToKeyFrame(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInf
 		PMXBone *b = pmxInfo.bones[i];
 		
 		BoneFrame *bf=getBoneFrame(targetFrame,b->name);
-		if(bf!=NULL)
-		{
-			setBoneToFrame(b,*bf);
-		}
-		else
-		{
-			
-		}
 		
 		if(b->parentBoneIndex==-1)
 		{
@@ -326,9 +283,15 @@ void setModelToKeyFrame(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInf
 			BoneFrame *bf=getBoneFrame(targetFrame,b->name);
 			if(bf!=NULL)
 			{
-				b->absoluteForm = pmxInfo.bones[b->parentBoneIndex]->absoluteForm * (b->relativeForm);
 				
-				
+				glm::mat4 aniMatrix=glm::toMat4(bf->quaternion);
+				aniMatrix[3][0]=bf->position.x;
+				aniMatrix[3][1]=bf->position.y;
+				aniMatrix[3][2]=bf->position.z;
+		
+				glm::mat4 invAniMatrix=glm::inverse(aniMatrix);
+				b->absoluteForm = pmxInfo.bones[b->parentBoneIndex]->absoluteForm * (setBoneToFrame(b,*bf));
+				//b->absoluteForm = 
 			}
 			else
 			{
@@ -344,7 +307,15 @@ void setModelToKeyFrame(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInf
 		<<invBindPose[i][2][0]<<" "<<invBindPose[i][2][1]<<" "<<invBindPose[i][2][2]<<" "<<invBindPose[i][2][3]<<endl
 		<<invBindPose[i][3][0]<<" "<<invBindPose[i][3][1]<<" "<<invBindPose[i][3][2]<<" "<<invBindPose[i][3][3]<<endl<<endl;*/
 		
-		Bone[i] = invBindPose[i] * b->absoluteForm;
+		if(bf!=NULL)
+		{
+		
+			Bone[i] = b->absoluteForm * invBindPose[i];
+		}
+		else
+		{
+			Bone[i] = b->absoluteForm * invBindPose[i];
+		}
 		
 		cout<<"Final Bone: "<<endl;
 		cout<<Bone[i][0][0]<<" "<<Bone[i][0][1]<<" "<<Bone[i][0][2]<<" "<<Bone[i][0][3]<<endl

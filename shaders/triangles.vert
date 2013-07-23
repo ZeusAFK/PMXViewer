@@ -14,7 +14,7 @@ layout(location = 5) in float vWeightFormula;
 out vec2 UV;
 out vec3 normal;
 
-uniform mat4 Bones[130];
+uniform mat4 Bones[150];
 
 void main()
 {

@@ -31,7 +31,7 @@ VMDInfo &readVMD()
 	miku.read((char*)&vmdInfo.boneCount,4);
 	vmdInfo.boneFrames=new BoneFrame[vmdInfo.boneCount];
 	
-	//cout<<"Bone Count: "<<vmdInfo.boneCount<<endl;
+	cout<<"Bone Count: "<<vmdInfo.boneCount<<endl;
 	
 	cout<<"Loading bone frames...";
 	for(int i=0; i<vmdInfo.boneCount; ++i)
