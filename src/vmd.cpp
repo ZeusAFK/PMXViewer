@@ -9,12 +9,12 @@
 
 using namespace std;
 
-VMDInfo &readVMD()
+VMDInfo &readVMD(string filename)
 {
 	VMDInfo *vInfo=new VMDInfo();
 	VMDInfo &vmdInfo=*vInfo;
 	
-	ifstream miku("motion/Masked bitcH.vmd", ios::in | ios::binary);
+	ifstream miku(filename.c_str(), ios::in | ios::binary);
 	if(!miku) cerr<<"ERROR: VMD file could not be opened"<<endl;
 	
 	//***Extract Header Info***

@@ -1,8 +1,8 @@
-#version 420 core
+#version 150 core
 
-layout(binding=0) uniform sampler2D textureSampler;
-layout(binding=1) uniform sampler2D textureSampler2;
-layout(binding=2) uniform sampler2D textureSampler3;
+uniform sampler2D textureSampler;
+uniform sampler2D textureSampler2;
+uniform sampler2D textureSampler3;
 
 
 uniform vec3 ambientColor;
@@ -26,7 +26,7 @@ void main()
 	if((UV[0]!=0 && UV[1]!=0))
 	{
 		color = vec4(0.5, 0.5, 1.0, 0.5);
-		//color = texture(textureSampler, UV).rgba;
+		color = texture(textureSampler, UV).rgba;
 		
 		/*vec3 lightColor=vec3(0.5,0.5,0.5);
 		vec3 lightDirection=vec3(0.01,-0.01,-0.04);
@@ -55,7 +55,7 @@ void main()
 	else
 	{
 		color = vec4(1.0, 0.5, 0.5, 1.0);
-		vec2 pos={0.1,0.1};
+		//vec2 pos={0.1,0.1};
 		
 		//color = texture(textureSampler, UV).rgb;
 		//color = texture(textureSampler, UV).rgb;

@@ -9,6 +9,51 @@
 
 using namespace std;
 
+	
+
+    std::string UTF16to8(const unsigned short * in)
+    {
+        std::string out;
+        unsigned int codepoint = 0;
+        for (in;  *in != 0;  ++in)
+        {
+            if (*in >= 0xd800 && *in <= 0xdbff)
+                codepoint = ((*in - 0xd800) << 10) + 0x10000;
+            else
+            {
+                if (*in >= 0xdc00 && *in <= 0xdfff)
+                    codepoint |= *in - 0xdc00;
+                else
+                    codepoint = *in;
+     
+                if (codepoint <= 0x7f)
+                    out.append(1, static_cast<char>(codepoint));
+                else if (codepoint <= 0x7ff)
+                {
+                    out.append(1, static_cast<char>(0xc0 | ((codepoint >> 6) & 0x1f)));
+                    out.append(1, static_cast<char>(0x80 | (codepoint & 0x3f)));
+                }
+                else if (codepoint <= 0xffff)
+                {
+                    out.append(1, static_cast<char>(0xe0 | ((codepoint >> 12) & 0x0f)));
+                    out.append(1, static_cast<char>(0x80 | ((codepoint >> 6) & 0x3f)));
+                    out.append(1, static_cast<char>(0x80 | (codepoint & 0x3f)));
+                }
+                else
+                {
+                    out.append(1, static_cast<char>(0xf0 | ((codepoint >> 18) & 0x07)));
+                    out.append(1, static_cast<char>(0x80 | ((codepoint >> 12) & 0x3f)));
+                    out.append(1, static_cast<char>(0x80 | ((codepoint >> 6) & 0x3f)));
+                    out.append(1, static_cast<char>(0x80 | (codepoint & 0x3f)));
+                }
+                codepoint = 0;
+            }
+        }
+        return out;
+    }
+
+
+
 void getPMXText(ifstream &miku, PMXInfo &pmxInfo, string &result, bool debug)
 {
 	uint32_t text_size;
@@ -41,6 +86,17 @@ void getPMXText(ifstream &miku, PMXInfo &pmxInfo, string &result, bool debug)
 		//if(debug)cout<<"Raw Text: "<<data_byte<<endl;
 		result = to_u8string(c16);
 		if(debug)cout<<"Result: "<<result<<endl;
+		
+		/*char16_t c16[text_size];
+		for(int i=0; i<text_size; ++i)
+		{
+			c16[i]=0;
+		}
+		
+		miku.read((char*)&c16,text_size);
+		
+		result=UTF16to8((const short unsigned*) c16);
+		cout<<result<<endl;*/
 		
 		//exit(EXIT_SUCCESS);
 	}
@@ -131,7 +187,7 @@ PMXInfo &readPMX(string filename)
 	
 	//***Extract header info***
 	miku.read(pmxInfo.header_str,4);
-	miku.read((char*)pmxInfo.ver,4);
+	miku.read((char*)&pmxInfo.ver,4);
 	
 	if(string(pmxInfo.header_str).find("PMX ")==-1)
 	{
@@ -139,10 +195,10 @@ PMXInfo &readPMX(string filename)
 		cerr<<"Error: Invalid PMX file header (is this really a PMX file?)"<<endl;
 		//exit(EXIT_FAILURE);
 	}
-	if(*pmxInfo.ver!=2.0)
+	if(pmxInfo.ver!=2.0)
 	{
 		cerr<<"Error: Only version 2.0 of the PMX file format is supported!"<<endl;
-		//exit(EXIT_FAILURE);
+		exit(EXIT_FAILURE);
 	}	
 	
 	miku.read((char*)&pmxInfo.line_size,1);
@@ -278,6 +334,10 @@ PMXInfo &readPMX(string filename)
 		miku.read((char*)&vertex->edgeScale,4);
 		
 		pmxInfo.vertices.push_back(vertex);
+		
+		delete x;
+		delete y;
+		delete z;
 	}
 	cout<<"done."<<endl;
 	
@@ -427,6 +487,7 @@ PMXInfo &readPMX(string filename)
 		miku.read(tmpBoneIndex,(int)pmxInfo.boneIndexSize);
 		
 		bone->parentBoneIndex=(int)*tmpBoneIndex;
+		delete tmpBoneIndex;
 		
 		/*cout<<(int)*tmpBoneIndex<<endl;
 		cout<<"PBI: "<<bone->parentBoneIndex<<endl;*/
@@ -869,7 +930,7 @@ PMXInfo &readPMX(string filename)
 
 void printDebugInfo(PMXInfo &pmxInfo)
 {
-	cout<<pmxInfo.header_str<<"ver "<<*pmxInfo.ver<<endl;
+	cout<<pmxInfo.header_str<<"ver "<<pmxInfo.ver<<endl;
 	
 	cout<<"line size: "<<(int)pmxInfo.line_size<<endl;
 	cout<<"Unicode Type(0-UTF-16, 1-UTF-8): "<<pmxInfo.unicode_type<<endl;

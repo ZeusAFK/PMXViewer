@@ -50,7 +50,7 @@ struct PMXVertex
 	glm::vec3 normal; //Surface normal
 	glm::vec2 UV; //UV
 	
-	uint8_t weight_transform_formula;
+	uint8_t weight_transform_formula; //0:BDEF1 1:BDEF2 2:BDEF4 3:SDEF
 	
 	//Bone Info
 	unsigned int boneIndex1;
@@ -320,7 +320,7 @@ struct PMXInfo
 	
 	//Header
 	char *header_str; //Should read 'PMX ' for 2.0+
-	float *ver; //version number
+	float ver; //version number
 	
 	uint8_t line_size; //number of bytes per line
 	bool unicode_type;
@@ -380,7 +380,6 @@ struct PMXInfo
 	PMXInfo()
 	{
 		header_str=(char*) malloc(sizeof(char)*4);
-		ver=(float*)malloc(sizeof(float));
 	}
 };
 

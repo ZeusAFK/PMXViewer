@@ -14,7 +14,7 @@ struct VMDInfo;
 
 //VMD related functions
 
-VMDInfo &readVMD();
+VMDInfo &readVMD(std::string filename);
 
 //VMD related structs
 
