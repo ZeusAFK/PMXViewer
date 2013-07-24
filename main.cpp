@@ -54,7 +54,7 @@ void loadTextures(PMXInfo &pmxInfo)
 			GLuint texture;
 			int width, height;
 			unsigned char* image;
-			string loc="data/model/gumiv3/"+pmxInfo.texturePaths[i];
+			string loc=pmxInfo.texturePaths[i];
 			
 			ifstream test(loc);
 			if(!test.is_open())
@@ -93,7 +93,7 @@ void loadTextures(PMXInfo &pmxInfo)
 			GLuint texture;
 			int width, height;
 			unsigned char* image;
-			string loc="data/model/gumiv3/"+pmxInfo.texturePaths[i];
+			string loc=pmxInfo.texturePaths[i];
 			
 			ifstream test(loc);
 			if(!test.is_open())
@@ -726,7 +726,7 @@ void mouseMotion(int x, int y)
 
 int main(int argc, char** argv)
 {
-	pmxInfo=readPMX("data/model/gumiv3/GUMI_V3.pmx");
+	pmxInfo=readPMX("data/model/gumiv3/","GUMI_V3.pmx");
 	vmdInfo=readVMD("data/motion/Masked bitcH.vmd");
 	
 	glutInit(&argc, argv);

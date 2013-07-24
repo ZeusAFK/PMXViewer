@@ -37,7 +37,7 @@ PMXBone *getChildBone(std::string &name, PMXBone *parentBone);
 int getBone(PMXInfo &pmxInfo, std::string &name);
 
 void getPMXText(std::ifstream &miku, PMXInfo &pmxInfo, std::string &result, bool debug=false);
-PMXInfo &readPMX(std::string filename);
+PMXInfo &readPMX(std::string foldername,std::string filename);
 
 #define PMX_ENCODE_UTF16 0
 #define PMX_ENCODE_UTF8 1

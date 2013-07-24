@@ -172,13 +172,15 @@ int getBone(PMXInfo &pmxInfo, string &name)
 	return -1;
 }
 
-PMXInfo &readPMX(string filename)
+PMXInfo &readPMX(string foldername,string filename)
 {
 	PMXInfo *pInfo=new PMXInfo();
 	PMXInfo &pmxInfo=*pInfo;
 	
+	string fname=foldername+filename;
+	
 	//ifstream miku("apimiku/Appearance Miku.pmx", ios::in | ios::binary);
-	ifstream miku(filename.c_str(), ios::in | ios::binary);
+	ifstream miku(fname.c_str(), ios::in | ios::binary);
 	if(!miku)
 	{
 		cerr<<"ERROR: PMX file could not be opened"<<endl;
@@ -327,7 +329,7 @@ PMXInfo &readPMX(string filename)
 		}
 		else
 		{
-			cerr<<"ERROR: bone structure not supported yet"<<endl;
+			cerr<<"ERROR: bone structure (QDEF?) not supported yet"<<endl;
 			exit(EXIT_FAILURE);
 		}
 	
@@ -365,6 +367,8 @@ PMXInfo &readPMX(string filename)
 	for(int i=0; i<pmxInfo.texture_continuing_datasets; ++i)
 	{
 		getPMXText(miku, pmxInfo, pmxInfo.texturePaths[i]);
+		
+		pmxInfo.texturePaths[i].insert(0,foldername);
 	}
 	cout<<"done."<<endl;
 	
