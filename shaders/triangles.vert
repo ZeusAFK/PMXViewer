@@ -30,7 +30,7 @@ void main()
 	index4=int(vBoneIndices.w);
 	weightFormula=int(vWeightFormula);
 	
-	if(weightFormula<=4)
+	if(1==1)
 	{
 		//newVertex = Bones[index1][0];
 		//newVertex = (Bones[index1] * vPosition) * (1.0-vBoneWeights.x);
@@ -68,7 +68,7 @@ void main()
 		}
 		else
 		{
-			newVertex+=vPosition;
+			//newVertex+=vPosition;
 		}
 		
 		
