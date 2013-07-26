@@ -64,6 +64,23 @@ void getPMXText(ifstream &miku, PMXInfo &pmxInfo, string &result, bool debug)
 	{
 		//WARNING: UTF-16 text-pulling code does NOT support the extra (multi-byte) codesets of UTF-16!!!!
 		
+		
+		#ifdef _WIN32
+		
+		
+		char16_t c16[text_size];
+		for(int i=0; i<text_size; ++i)
+		{
+			c16[i]=0;
+		}
+		
+		miku.read((char*)&c16,text_size);
+		
+		result=UTF16to8((const short unsigned*) c16);
+		cout<<result<<endl;
+		
+		#else
+		
 		char16_t c16[text_size];
 		u16string s16;
 		for(int i=0; i<text_size; ++i)
@@ -86,17 +103,8 @@ void getPMXText(ifstream &miku, PMXInfo &pmxInfo, string &result, bool debug)
 		//if(debug)cout<<"Raw Text: "<<data_byte<<endl;
 		result = to_u8string(c16);
 		if(debug)cout<<"Result: "<<result<<endl;
-		
-		/*char16_t c16[text_size];
-		for(int i=0; i<text_size; ++i)
-		{
-			c16[i]=0;
-		}
-		
-		miku.read((char*)&c16,text_size);
-		
-		result=UTF16to8((const short unsigned*) c16);
-		cout<<result<<endl;*/
+
+		#endif // WIN32
 		
 		//exit(EXIT_SUCCESS);
 	}

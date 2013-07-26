@@ -365,9 +365,9 @@ void setModelToKeyFrame(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInf
 						exit(EXIT_FAILURE);
 					}*/
 					
-					//b->relativeForm= aniMatrix2 * b->relativeForm;
+					//b->relativeForm= (aniMatrix);
 					//b->absoluteForm= aniMatrix * pmxInfo.bones[b->parentBoneIndex]->absoluteForm;
-					//b->absoluteForm= pmxInfo.bones[b->parentBoneIndex]->absoluteForm * b->relativeForm;
+					//b->absoluteForm= aniMatrix * pmxInfo.bones[b->parentBoneIndex]->absoluteForm;
 					
 					//Bone[i] = boneFix(targetFrame,b,i) * invBindPose[i];
 					//Bone[i] =  b->absoluteForm * invBindPose[i];
@@ -426,16 +426,17 @@ void init(PMXInfo &pmxInfo, VMDInfo &vmdInfo)
 	//Load Textures
 	loadTextures(pmxInfo);
 	
-	GLushort vertexIndices[pmxInfo.face_continuing_datasets][3];
+	//GLushort vertexIndices[pmxInfo.face_continuing_datasets][3];
+	GLushort *vertexIndices= (GLushort*) malloc(pmxInfo.face_continuing_datasets*sizeof(GLushort)*3);
 	for(int i=0; i<pmxInfo.faces.size(); ++i) //faces.size()
 	{
-		//cout<<i<<endl;
-		vertexIndices[i][0]=pmxInfo.faces[i]->points[0];
-		vertexIndices[i][1]=pmxInfo.faces[i]->points[1];
-		vertexIndices[i][2]=pmxInfo.faces[i]->points[2];
+		int j=i*3;
+		vertexIndices[j]=pmxInfo.faces[i]->points[0];
+		vertexIndices[j+1]=pmxInfo.faces[i]->points[1];
+		vertexIndices[j+2]=pmxInfo.faces[i]->points[2];
 	}
 	
-	VertexData vertexData[pmxInfo.vertex_continuing_datasets];
+	VertexData *vertexData = (VertexData*)malloc(pmxInfo.vertex_continuing_datasets*sizeof(VertexData));
 	for(int i=0; i<pmxInfo.vertex_continuing_datasets; ++i)
 	{
 		vertexData[i].position.x=pmxInfo.vertices[i]->pos[0];
@@ -478,7 +479,7 @@ void init(PMXInfo &pmxInfo, VMDInfo &vmdInfo)
 	
 	//init Element Buffer Object
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[VertexIndexBuffer]);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(vertexIndices), vertexIndices, GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, pmxInfo.face_continuing_datasets*sizeof(GLushort)*3, vertexIndices, GL_STATIC_DRAW);
 	
 	
 	
@@ -487,7 +488,7 @@ void init(PMXInfo &pmxInfo, VMDInfo &vmdInfo)
 	glBindVertexArray(VAOs[Vertices]);
 	
 	glBindBuffer(GL_ARRAY_BUFFER, Buffers[VertexArrayBuffer]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertexData), vertexData, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, pmxInfo.vertex_continuing_datasets*sizeof(VertexData), vertexData, GL_STATIC_DRAW);
 	
 	//Intialize Vertex Attribute Pointer	
 	glVertexAttribPointer(vPosition, 4, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(0)); //4=number of components updated per vertex
@@ -507,6 +508,9 @@ void init(PMXInfo &pmxInfo, VMDInfo &vmdInfo)
 	
 	glVertexAttribPointer(vBoneWeights, 4, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(float)*14));
 	glEnableVertexAttribArray(vBoneWeights);
+	
+	free(vertexData);
+	free(vertexIndices);
 	
 	
 
@@ -531,36 +535,12 @@ void init(PMXInfo &pmxInfo, VMDInfo &vmdInfo)
 		bindPose[i] = (pmxInfo.bones[i]->absoluteForm);
 		invBindPose[i] = glm::inverse(bindPose[i]);
 	}
-	
-	
-	
 	glm::mat4 *Bone=new glm::mat4[pmxInfo.bone_continuing_datasets]();
-	setModelToKeyFrame(Bone,shaderProgram, pmxInfo, vmdInfo);
+	//setModelToKeyFrame(Bone,shaderProgram, pmxInfo, vmdInfo);
 	
-	
-	
-	
-	
-	
-	
-	//Init Bone Data
-	GLfloat boneData[pmxInfo.bone_continuing_datasets][4];
-	for(int i=0; i<pmxInfo.bone_continuing_datasets; ++i)
-	{
-		boneData[i][0]=Bone[i][0][3];
-		boneData[i][1]=Bone[i][1][3];
-		boneData[i][2]=Bone[i][2][3];
-		boneData[i][3]=1.0;
-		//cout<<Bone[i][0][3]<<" "<<Bone[i][1][3]<<" "<<Bone[i][2][3]<<endl;
-	}
-	glBindVertexArray(VAOs[BoneVertices]);
-	glBindBuffer(GL_ARRAY_BUFFER, Buffers[BoneBuffer]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(boneData), boneData, GL_STATIC_DRAW);
-	
-	glVertexAttribPointer(vPosition, 4, GL_FLOAT, GL_FALSE, NO_STRIDE, BUFFER_OFFSET(0)); //4=number of components updated per vertex
-	glEnableVertexAttribArray(vPosition);
-	
-	
+	free(bindPose);
+	free(invBindPose);
+	free(Bone);
     
     glDisable(GL_CULL_FACE);
 	glEnable(GL_DEPTH_TEST);
@@ -659,41 +639,11 @@ void drawModel(PMXInfo &pmxInfo)
 	}
 }
 
-void drawSkeleton()
-{
-	//WARNING: Code broken at this point
-	
-	/*glBindVertexArray(VAOs[BoneVertices]);
-	glBindBuffer(GL_ARRAY_BUFFER, Buffers[BoneBuffer]);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	
-	MVP_loc = glGetUniformLocation(shaderProgram, "MVP");
-	
-	glm::mat4 Projection = glm::perspective(45.0f, 16.0f/9.0f, 0.1f, 100.0f);
-	// Camera matrix
-	glm::mat4 View       = glm::lookAt(
-		glm::vec3(cameraPosition.x,cameraPosition.y,cameraPosition.z), // Camera is at (4,3,3), in World Space
-		cameraTarget, // and looks at the origin
-		glm::vec3(0,1,0)  // Head is up (set to 0,-1,0 to look upside-down)
-	);
-	View= glm::rotate(0.0f,0.0f,0.0f,1.0f)* View;
-	// Model matrix : an identity matrix (model will be at the origin)
-	glm::mat4 Model = glm::rotate(0.0f, 0.0f, 0.0f, 1.0f) * glm::translate(modelTranslate.x, modelTranslate.y, modelTranslate.z);
-	// Our ModelViewProjection : multiplication of our 3 matrices
-	glm::mat4 MVP = Projection * View * Model;
-	
-	glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, &MVP[0][0]);
-	
-	glDrawArrays(GL_POINTS, 0, GL_FLOAT);*/
-}
-
 void display()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
 	drawModel(pmxInfo);
-	
-	//drawSkeleton();
 	
 	glutSwapBuffers();
 }

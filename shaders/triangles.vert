@@ -68,8 +68,9 @@ void main()
 		}
 		else
 		{
-			//newVertex+=vPosition;
+			newVertex+=vPosition;
 		}
+		newVertex+=vPosition;
 		
 		
 		gl_Position = MVP * newVertex;
