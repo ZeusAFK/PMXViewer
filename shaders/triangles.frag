@@ -26,7 +26,7 @@ void main()
 	if((UV[0]!=0 && UV[1]!=0))
 	{
 		color = vec4(0.5, 0.5, 1.0, 0.5);
-		//color = texture(textureSampler, UV).rgba;
+		color = texture(textureSampler, UV).rgba;
 		
 		/*vec3 lightColor=vec3(0.5,0.5,0.5);
 		vec3 lightDirection=vec3(0.01,-0.01,-0.04);

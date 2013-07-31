@@ -549,11 +549,28 @@ PMXInfo &readPMX(string foldername,string filename)
 		miku.read((char*)&bone->position.z,4);
 		
 		//***Pull Parent Index***
-		char *tmpBoneIndex=(char*) malloc(pmxInfo.boneIndexSize);
-		miku.read(tmpBoneIndex,(int)pmxInfo.boneIndexSize);
-		
-		bone->parentBoneIndex=(int)*tmpBoneIndex;
-		delete tmpBoneIndex;
+		//TODO: Apply this method of setting the index to the rest of the file-reading code (make a function)
+		if(pmxInfo.boneIndexSize==1)
+		{
+			int8_t tmpBoneIndex;
+			miku.read((char*)&tmpBoneIndex,(int)pmxInfo.boneIndexSize);
+			
+			bone->parentBoneIndex=(int)tmpBoneIndex;
+		}
+		else if(pmxInfo.boneIndexSize==2)
+		{
+			int16_t tmpBoneIndex;
+			miku.read((char*)&tmpBoneIndex,(int)pmxInfo.boneIndexSize);
+			
+			bone->parentBoneIndex=(int)tmpBoneIndex;
+		}
+		else if(pmxInfo.boneIndexSize==4)
+		{
+			int tmpBoneIndex;
+			miku.read((char*)&tmpBoneIndex,(int)pmxInfo.boneIndexSize);
+			
+			bone->parentBoneIndex=(int)tmpBoneIndex;
+		}
 		
 		if(bone->parentBoneIndex<-1)
 		{

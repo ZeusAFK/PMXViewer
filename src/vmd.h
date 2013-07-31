@@ -24,7 +24,7 @@ struct BoneFrame
 	
 	unsigned int frame;
 	
-	glm::vec3 position; //values will be 0 when there's no position
+	glm::vec3 translation; //values will be 0 when there's no position
 	glm::quat quaternion; //values will be 0 when there's no position (w will be 1.0)
 	
 	std::string interpolationParameters; //char[64] before UTF8 conversion

@@ -44,9 +44,9 @@ VMDInfo &readVMD(string filename)
 		
 		miku.read((char*)&f->frame,4);
 		
-		miku.read((char*)&f->position.x,4);
-		miku.read((char*)&f->position.y,4);
-		miku.read((char*)&f->position.z,4);
+		miku.read((char*)&f->translation.x,4);
+		miku.read((char*)&f->translation.y,4);
+		miku.read((char*)&f->translation.z,4);
 		
 		//cout<<f->position.x<<" "<<f->position.y<<" "<<f->position.z<<endl;
 		
