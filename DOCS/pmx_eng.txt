@@ -1,7 +1,6 @@
-#Partial translation of PMX.txt by @sn0w75 (http://twitter.com/sn0w75)
-#Only the sections concerning bone translations were translated.
+#Partial translation of PMX.txt by sn0w75 (http://twitter.com/sn0w75)
+#Only sections concerning bone translations were translated.
 #Translation notes will be denoted with '#'
-#Enjoy! :D Feel free to contact if you have questions.
 
 ●Bone Transformations
 
@@ -12,7 +11,7 @@ The order for bone transformation is:
 2. Transformation Level	#In pmx.h, this is the transformationLevel property for a PMXBone
 3. Index Order
 
-After normalization, bone transformation is done in this order.A given bone's local transformation processing, with the exception of processing triggered by IK links, is only done once.
+After normalization, bone transformation is done in this order. A given bone's local transformation processing, with the exception of processing triggered by IK links, is only done once.
 
 Example:
 A, Before(Physics),Level2,Index0

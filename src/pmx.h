@@ -158,7 +158,7 @@ struct PMXBone
 	//If connectionDisplayMethod==1
 	unsigned int connectionBoneIndex;
 	
-	//If rotationAllowed==1 or movementAllowed==1
+	//If giveRotation==1 or giveTranslation==1
 	unsigned int givenParentBoneIndex;
 	float giveRate;
 	
@@ -184,6 +184,9 @@ struct PMXBone
 	//VARIABLES I ADDED BELOW THIS POINT
 	
 	glm::mat4 relativeForm,absoluteForm;
+	
+	glm::vec3 finalPosition;
+	glm::quat finalRotation;
 };
 
 struct PMXMorphData
@@ -359,7 +362,6 @@ struct PMXInfo
 	//Bone
 	int bone_continuing_datasets;
 	std::vector<PMXBone*> bones;
-	PMXBone *parentBone;
 	
 	//Morph (Emotion data)
 	int morph_continuing_datasets;

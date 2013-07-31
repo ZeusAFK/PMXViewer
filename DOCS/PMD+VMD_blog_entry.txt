@@ -1,0 +1,95 @@
+#Partial translation of blog entry concerning FK animation using PMD and VMD by sn0w75 (http://twitter.com/sn0w75)
+#Original page: http://d.hatena.ne.jp/edvakf/20111026/1319656727
+
+
+---Forward Kinematics---
+PMD records each Bone's original posiition, and VMD records each bone's rotation and translation for each keyframe.
+
+From here we calculate the "Position After Movement" and "Rotation After Movement". The reason why we do this is, VMD's rotation and translation is just a relative movement from the Parent Bone, so we have to calculate to get coordinate form.
+
+PMD's bone array starts with "Center", and all the following bones go from parent to child (A given bone's parent will never show up after that bone), so we can just calculate starting from the beginning going in order.
+
+[TL Note: PMD's root bone is always 'Center', PMX sometimes has a different bone name for the root bone]
+
+First, for the Center [AKA root bone]:
+
+Position After Movement = Original Position + Translation
+Rotation After Movement = Rotation
+
+This is easily calculated, and for the rest of the bones, it goes like this:
+
+Position After Movement = Parent Bone * (Original Position - Parent's Original Position + Translation) + Parent's Position After Movement
+
+Rotation After Movement = Parent's Rotation * Rotation
+
+[TL Note: PMX files record relative positions, while PMD files record absolute positions. Therefore, Original Position here refers to the Global Position for a given bone.
+
+Given that, Original Position - Parent's Original Position is the equivalent of the Inverse Bind Pose for the Bone.]
+
+
+I just put a * for the rotation stuff, but when calculating use quaternion definitions. (You could convert to a matrix if you wanted, but afterwords memory becomes a problem so I think calculating as quaternions is better)
+
+http://www015.upp.so-net.ne.jp/notgeld/quaternion.html (On Quaternions)
+
+Inverse Kinetics goes in reverse, moving the bone going from child to parent. This, I haven't implemented yet.
+
+---Skinning---
+When each vertex in a model moves with a bone, it is called skinning.
+
+You take the above movement and add them to the vertex, but the number of vertices is very great, so in JavaScript if you use a loop it's slow. So, I send each bone's "Original Position", "Position After Movement", and "Rotation After Movement" and send it to the vertex shader to do stuff.
+
+uniform vec3 uBonePosOriginal[64];
+uniform vec3 uBonePosMoved[64];
+uniform vec4 uBoneRotations[64]; // quaternion
+
+
+[TL Note: Here he talks about WebGL having a 64-bone limit and other web browser limits. Not really relevant to us so skipping.]
+
+Here's the code I used for the shader:
+
+// ...
+
+  uniform vec3 uBonePosOriginal[64];
+  uniform vec3 uBonePosMoved[64];
+  uniform vec4 uBoneRotations[64]; // quaternion
+
+  attribute float aBone1;
+  attribute float aBone2;
+  attribute float aBoneWeight;
+
+  void main() {
+
+// ...
+
+      int b1 = int(aBone1);
+      vec3 o1 = uBonePosOriginal[b1];
+      vec3 p1 = uBonePosMoved[b1];
+      vec4 q1 = uBoneRotations[b1];
+      vec3 r1 = qtransform(q1, position - o1) + p1;
+
+      int b2 = int(aBone2);
+      vec3 o2 = uBonePosOriginal[b2];
+      vec3 p2 = uBonePosMoved[b2];
+      vec4 q2 = uBoneRotations[b2];
+      vec3 r2 = qtransform(q2, position - o2) + p2;
+
+      position = mix(r2, r1, aBoneWeight);
+
+// ...
+
+
+
+For each vertex, two bones are affected so it ends up like this. For details, search Google for "Vertex Blending". Also I used this as a reference:
+http://rudora7.blog81.fc2.com/blog-entry-298.html
+
+This part below:
+vec3 r1 = qtransform(q1, position - o1) + p1;
+
+Is the same as this part that was above:
+Position After Movement = Parent Bone * (Original Position - Parent's Original Position + Translation) + Parent's Position After Movement
+
+In other words, to the skin's vertex, its parent is a bone. There's no translation (although morphs would be in that category).
+
+---Vector Rotation with Quaternions
+
+[TL Note: TL ends here, see original page for formulas]

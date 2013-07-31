@@ -1,6 +1,7 @@
 //g++ *.cpp *.cc -o pmx -L./ -lglut -lGLU -lGLEW -lGL -ggdb -lSOIL -std=c++11
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
 #include "vgl.h"
 //#include "vmath.h"
@@ -18,8 +19,13 @@
 #include "src/pmx.h"
 #include "src/vmd.h"
 #include "src/shader.h"
+#include "src/pmxvLogger.h"
 
 #define NO_STRIDE 0
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 using namespace std;
 
@@ -43,7 +49,9 @@ VMDInfo vmdInfo;
 glm::mat4 *bindPose;
 glm::mat4 *invBindPose;
 
-
+glm::mat4 *Bone;
+glm::quat boneQuat;
+glm::quat boneQuat2;
 
 vector<GLuint> textures;
 
@@ -234,11 +242,17 @@ glm::mat4 setBoneToFrame(PMXBone *b, BoneFrame &bf)
 
 BoneFrame *getBoneFrame(int frame, string boneName)
 {
+	stringstream ss;
+	
 	for(int i=0; i<vmdInfo.boneCount; ++i)
-	{
+	{		
 		//cout<<"VMD NAME: "<<vmdInfo.boneFrames[i].name<<endl;
-		if(vmdInfo.boneFrames[i].name==boneName && vmdInfo.boneFrames[i].frame==frame) return &vmdInfo.boneFrames[i];
+		if(vmdInfo.boneFrames[i].name==boneName && vmdInfo.boneFrames[i].frame==frame)
+		{
+			return &vmdInfo.boneFrames[i];
+		}
 	}
+	
 	
 	//cerr<<"No bone found: "<<boneName<<endl;
 	
@@ -255,7 +269,7 @@ glm::mat4 invToParent(PMXBone *b, int index)
 }
 
 glm::mat4 boneFix(int &targetFrame,PMXBone *b, int index)
-{	
+{
 	glm::mat4 blank;
 	BoneFrame *bf=getBoneFrame(targetFrame,b->name);
 	
@@ -281,151 +295,404 @@ glm::mat4 boneFix(int &targetFrame,PMXBone *b, int index)
 	}
 }
 
+glm::quat quatMultiplication(glm::quat &left, glm::quat right)
+{   
+	glm::quat ans;
+	double   d1, d2, d3, d4;
+       
+	d1   =  left.w * right.w;
+	d2   = -left.x * right.x;
+	d3   = -left.y * right.y;
+	d4   = -left.z * right.z;
+	ans.w = d1+ d2+ d3+ d4;
+       
+	d1   =  left.w * right.x;
+	d2   =  right.w * left.x;
+	d3   =  left.y * right.z;
+	d4   = -left.z * right.y;
+	ans.x =  d1+ d2+ d3+ d4;
+       
+	d1   =  left.w * right.y;
+	d2   =  right.w * left.y;
+	d3   =  left.z * right.x;
+	d4   = -left.x * right.z;
+	ans.y =  d1+ d2+ d3+ d4;
+       
+	d1   =  left.w * right.z;
+	d2   =  right.w * left.z;
+	d3   =  left.x * right.y;
+	d4   = -left.y * right.x;
+	ans.z =  d1+ d2+ d3+ d4; 
+                    
+	return ans;
+}
+
+glm::vec3 qtransform(glm::quat q, glm::vec3 v)
+{
+	glm::vec3 quat3;
+	quat3.x=q.x;
+	quat3.y=q.y;
+	quat3.z=q.z;
+	glm::vec3 crossProduct=glm::cross(glm::cross(v, quat3) - q.w*v, quat3);
+	return v + 2.0f * crossProduct;
+}
+
+glm::mat4 setRotate(glm::quat q, glm::vec3 centre)
+{
+	double sqw = q.w*q.w;
+	double sqx = q.x*q.x;
+	double sqy = q.y*q.y;
+	double sqz = q.z*q.z;
+	glm::mat4 m;
+	m[0][0] = sqx - sqy - sqz + sqw; // since sqw + sqx + sqy + sqz =1
+	m[1][1] = -sqx + sqy - sqz + sqw;
+	m[2][2] = -sqx - sqy + sqz + sqw;
+   
+	double tmp1 = q.x*q.y;
+	double tmp2 = q.z*q.w;
+	m[0][1] = 2.0 * (tmp1 + tmp2);
+	m[1][0] = 2.0 * (tmp1 - tmp2);
+   
+	tmp1 = q.x*q.z;
+	tmp2 = q.y*q.w;
+	m[0][2] = 2.0 * (tmp1 - tmp2);
+	m[2][0] = 2.0 * (tmp1 + tmp2);
+   
+	tmp1 = q.y*q.z;
+	tmp2 = q.x*q.w;
+	m[1][2] = 2.0 * (tmp1 + tmp2);
+	m[2][1] = 2.0 * (tmp1 - tmp2);
+   
+	double a1 = centre.x;
+	double a2 = centre.y;
+	double a3 = centre.z;
+	
+	m[0][3] = a1 - a1 * m[0][0] - a2 * m[0][1] - a3 * m[0][2];
+	m[1][3] = a2 - a1 * m[1][0] - a2 * m[1][1] - a3 * m[1][2];
+	m[2][3] = a3 - a1 * m[2][0] - a2 * m[2][1] - a3 * m[2][2];
+	m[3][0] = m[3][1] = m[3][2] = 0.0;
+	m[3][3] = 1.0;
+	
+	return m;
+}
+
+#define CONST_TEST_FRAME_NUMBER 0
 void setModelToKeyFrame(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInfo, VMDInfo &vmdInfo)
 {
-	//*****************LOOK HERE*****************/
+
+	int targetFrame = CONST_TEST_FRAME_NUMBER;
+	glm::mat4 aniMatrix;
 	
+	//stringstream ss;
+	//ss << "Bone matrices:" << endl;
+	
+	// root bone
+	PMXBone   *b  = pmxInfo.bones[0];
+	BoneFrame *bf = getBoneFrame(targetFrame, b->name);
+
+	b->absoluteForm = b->relativeForm;		
+	Bone[0] = b->absoluteForm * invBindPose[0];
+	
+	// other bones
+	for (size_t i = 1; i < pmxInfo.bone_continuing_datasets; i++)
+	{
+		//int i=32;
+		b  = pmxInfo.bones[i];
+		bf = getBoneFrame(targetFrame, b->name);
+
+		if (bf != NULL)
+		{
+			b->absoluteForm = (glm::translate(b->position + bf->position) * glm::toMat4(bf->quaternion)) * pmxInfo.bones[b->parentBoneIndex]->absoluteForm;
+			b->finalRotation = bf->quaternion * pmxInfo.bones[b->parentBoneIndex]->finalRotation;
+			cout<<b->name<<endl;
+			cout<<"Quat: "<<bf->quaternion.x<<" "<<bf->quaternion.y<<" "<<bf->quaternion.z<<" "<<bf->quaternion.w<<endl;
+			cout<<"ParentQuat: "<<pmxInfo.bones[b->parentBoneIndex]->finalRotation.x<<" "<<pmxInfo.bones[b->parentBoneIndex]->finalRotation.y<<" "<<pmxInfo.bones[b->parentBoneIndex]->finalRotation.z<<" "<<pmxInfo.bones[b->parentBoneIndex]->finalRotation.w<<endl;
+			cout<<"FinalRotation: "<<b->finalRotation.x<<" "<<b->finalRotation.y<<" "<<b->finalRotation.z<<" "<<b->finalRotation.w<<endl<<endl;
+			
+			glm::mat4 quatMatrix=glm::toMat4(bf->quaternion);
+			stringstream ss;
+			ss<<"Quat Matrix: "<<endl
+			<<quatMatrix[0][0]<<" "<<quatMatrix[1][0]<<" "<<quatMatrix[2][0]<<" "<<quatMatrix[3][0]<<endl
+			<<quatMatrix[0][1]<<" "<<quatMatrix[1][1]<<" "<<quatMatrix[2][1]<<" "<<quatMatrix[3][1]<<endl
+			<<quatMatrix[0][2]<<" "<<quatMatrix[1][2]<<" "<<quatMatrix[2][2]<<" "<<quatMatrix[3][2]<<endl
+			<<quatMatrix[0][3]<<" "<<quatMatrix[1][3]<<" "<<quatMatrix[2][3]<<" "<<quatMatrix[3][3]<<endl;
+			
+			log(ss.str());
+		}
+		else
+		{
+			b->absoluteForm = b->relativeForm * pmxInfo.bones[b->parentBoneIndex]->absoluteForm;
+			b->finalRotation = pmxInfo.bones[b->parentBoneIndex]->finalRotation;
+		}
+
+		Bone[i] = b->absoluteForm * invBindPose[i];
+	}
+	
+	GLuint Bones_loc = glGetUniformLocation(shaderProgram, "Bones");
+	glUniformMatrix4fv(Bones_loc, pmxInfo.bone_continuing_datasets, GL_FALSE, (const GLfloat*)Bone);
+}
+
+void setModelToKeyFrameSingleQuat(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInfo, VMDInfo &vmdInfo)
+{
+
+	int targetFrame = CONST_TEST_FRAME_NUMBER;
+	glm::mat4 aniMatrix;
+	
+	// root bone
+	PMXBone   *b  = pmxInfo.bones[0];
+	BoneFrame *bf = getBoneFrame(targetFrame, b->name);
+
+	b->absoluteForm = b->relativeForm;
+	if(bf!=NULL)
+	{
+		b->finalRotation = bf->quaternion;
+		
+		glm::vec4 homoPosition=glm::vec4(b->position + bf->position,1.0); //position in homogeneous coordinates
+		glm::vec4 localPosition=glm::rotate(b->finalRotation,homoPosition);
+		
+		b->relativeForm[3][0]=localPosition[0];
+		b->relativeForm[3][1]=localPosition[1];
+		b->relativeForm[3][2]=localPosition[2];
+		b->relativeForm[3][3]=localPosition[3];
+	}
+	Bone[0] = b->absoluteForm * invBindPose[0];
+	
+	
+	
+	// other bones
+	for (size_t i = 1; i < pmxInfo.bone_continuing_datasets; i++)
+	{
+		b  = pmxInfo.bones[i];
+		PMXBone *parent = pmxInfo.bones[b->parentBoneIndex];
+		bf = getBoneFrame(targetFrame, b->name);
+		
+		if(bf!=NULL && i>=46 && i<=48)
+		{
+			cout<<i<<" "<<b->name<<" "<<bf->name<<endl;
+			b->finalRotation = glm::normalize(bf->quaternion * parent->finalRotation);
+			
+			cout<<b->rotationPossible<<" "<<b->movementPossible<<" "<<b->localAxis<<" "<<endl;
+			
+			glm::vec4 homoPosition=glm::vec4(b->position + bf->position,1.0); //position in homogeneous coordinates
+			
+			cout<<"homoPosition: "<<homoPosition[0]<<" "<<homoPosition[1]<<" "<<homoPosition[2]<<" "<<homoPosition[3]<<endl<<endl;
+			
+			glm::vec4 localPosition=glm::rotate(glm::normalize(parent->finalRotation),homoPosition);
+			
+			b->relativeForm=glm::toMat4(bf->quaternion);
+			b->relativeForm[3][0]=localPosition[0];
+			b->relativeForm[3][1]=localPosition[1];
+			b->relativeForm[3][2]=localPosition[2];
+			b->relativeForm[3][3]=localPosition[3];			
+			
+			cout<<"relativeForm: "<<endl
+			<<b->relativeForm[0][0]<<" "<<b->relativeForm[1][0]<<" "<<b->relativeForm[2][0]<<" "<<b->relativeForm[3][0]<<endl
+			<<b->relativeForm[0][1]<<" "<<b->relativeForm[1][1]<<" "<<b->relativeForm[2][1]<<" "<<b->relativeForm[3][1]<<endl
+			<<b->relativeForm[0][2]<<" "<<b->relativeForm[1][2]<<" "<<b->relativeForm[2][2]<<" "<<b->relativeForm[3][2]<<endl
+			<<b->relativeForm[0][3]<<" "<<b->relativeForm[1][3]<<" "<<b->relativeForm[2][3]<<" "<<b->relativeForm[3][3]<<endl<<endl;
+			
+			cout<<"absoluteForm: "<<endl
+			<<b->absoluteForm[0][0]<<" "<<b->absoluteForm[1][0]<<" "<<b->absoluteForm[2][0]<<" "<<b->absoluteForm[3][0]<<endl
+			<<b->absoluteForm[0][1]<<" "<<b->absoluteForm[1][1]<<" "<<b->absoluteForm[2][1]<<" "<<b->absoluteForm[3][1]<<endl
+			<<b->absoluteForm[0][2]<<" "<<b->absoluteForm[1][2]<<" "<<b->absoluteForm[2][2]<<" "<<b->absoluteForm[3][2]<<endl
+			<<b->absoluteForm[0][3]<<" "<<b->absoluteForm[1][3]<<" "<<b->absoluteForm[2][3]<<" "<<b->absoluteForm[3][3]<<endl<<endl;
+		}
+		else
+		{
+			b->finalRotation = glm::normalize(parent->finalRotation);
+			
+			glm::vec4 homoPosition=glm::vec4(b->position,1.0); //position in homogeneous coordinates
+			glm::vec4 parentOriginalLocalPosition=glm::vec4(b->relativeForm[3][0],b->relativeForm[3][1],b->relativeForm[3][2],b->relativeForm[3][3]);
+			glm::vec4 localPosition=glm::rotate(b->finalRotation,homoPosition);
+			
+			b->relativeForm[3][0]=localPosition[0];
+			b->relativeForm[3][1]=localPosition[1];
+			b->relativeForm[3][2]=localPosition[2];
+			b->relativeForm[3][3]=localPosition[3];
+		}
+		
+		b->absoluteForm = b->relativeForm * parent->absoluteForm;
+		Bone[i] = b->absoluteForm * invBindPose[i];
+			
+	}
+	
+	/*GLuint Bones_loc = glGetUniformLocation(shaderProgram, "Bones");
+	glUniformMatrix4fv(Bones_loc, pmxInfo.bone_continuing_datasets, GL_FALSE, (const GLfloat*)Bone);*/
+}
+
+/*void setModelToKeyFrame2(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInfo, VMDInfo &vmdInfo)
+{
 	cout<<"START BONE READ"<<endl;
 	
-	cout<<"Bone vector size: "<<pmxInfo.bone_continuing_datasets<<endl;
-	
-	PMXBone *parentBone=pmxInfo.parentBone;
 	int targetFrame=0;
 	
 	//glm::mat4 skinMatrix[pmxInfo.bone_continuing_datasets];
 	for(size_t i=0; i<pmxInfo.bone_continuing_datasets; i++)
 	{
-		//int i=32;
-		PMXBone *b = pmxInfo.bones[i];
+		PMXBone *b=pmxInfo.bones[i];
 		BoneFrame *bf=getBoneFrame(targetFrame,b->name);
 		
-		/*if(bf!=NULL)
-		{
-				glm::mat4 aniMatrix=glm::toMat4(bf->quaternion);
-				aniMatrix[3][0]+=b->position.x + bf->position.x;
-				aniMatrix[3][1]+=b->position.y + bf->position.y;
-				aniMatrix[3][2]+=b->position.z + bf->position.z;
-				
-				if(b->parentBoneIndex==-1)
-				{
-					b->absoluteForm=aniMatrix * b->relativeForm;
-				}
-				else
-				{
-					//b->absoluteForm=aniMatrix * pmxInfo.bones[b->parentBoneIndex]->absoluteForm;
-					
-					cout<<"b->absoluteForm: "<<endl;
-					cout<<b->absoluteForm[0][0]<<" "<<b->absoluteForm[0][1]<<" "<<b->absoluteForm[0][2]<<" "<<b->absoluteForm[0][3]<<endl
-					<<b->absoluteForm[1][0]<<" "<<b->absoluteForm[1][1]<<" "<<b->absoluteForm[1][2]<<" "<<b->absoluteForm[1][3]<<endl
-					<<b->absoluteForm[2][0]<<" "<<b->absoluteForm[2][1]<<" "<<b->absoluteForm[2][2]<<" "<<b->absoluteForm[2][3]<<endl
-					<<b->absoluteForm[3][0]<<" "<<b->absoluteForm[3][1]<<" "<<b->absoluteForm[3][2]<<" "<<b->absoluteForm[3][3]<<endl<<endl;
-					
-					//b->absoluteForm=(aniMatrix) * pmxInfo.bones[b->parentBoneIndex]->absoluteForm;
-				}
-		}
-		else
-		{
-			b->absoluteForm = pmxInfo.bones[b->parentBoneIndex]->absoluteForm * b->relativeForm;
-		}*/
+		glm::vec3 originalBonePos=glm::vec3(bindPose[i][3][0],bindPose[i][3][1],bindPose[i][3][2]);
+		glm::vec3 originalParentBonePos=glm::vec3(bindPose[b->parentBoneIndex][3][0],bindPose[b->parentBoneIndex][3][1],bindPose[b->parentBoneIndex][3][2]);
 		
-		cout<<"invBindPose: "<<endl;
-		cout<<invBindPose[i][0][0]<<" "<<invBindPose[i][0][1]<<" "<<invBindPose[i][0][2]<<" "<<invBindPose[i][0][3]<<endl
-		<<invBindPose[i][1][0]<<" "<<invBindPose[i][1][1]<<" "<<invBindPose[i][1][2]<<" "<<invBindPose[i][1][3]<<endl
-		<<invBindPose[i][2][0]<<" "<<invBindPose[i][2][1]<<" "<<invBindPose[i][2][2]<<" "<<invBindPose[i][2][3]<<endl
-		<<invBindPose[i][3][0]<<" "<<invBindPose[i][3][1]<<" "<<invBindPose[i][3][2]<<" "<<invBindPose[i][3][3]<<endl<<endl;
-		
+		glm::vec3 finalPosition;
+		glm::quat finalRotation;
 		if(bf!=NULL)
 		{
-				glm::mat4 aniMatrix=glm::toMat4(bf->quaternion);
-				aniMatrix[3][0]+=b->position.x + bf->position.x;
-				aniMatrix[3][1]+=b->position.y + bf->position.y;
-				aniMatrix[3][2]+=b->position.z + bf->position.z;
+			if(b->parentBoneIndex==-1)
+			{
+				finalPosition=b->position+bf->position;
+				finalRotation=bf->quaternion;
+			}
+			else
+			{
+				PMXBone *parentBone=pmxInfo.bones[b->parentBoneIndex];
 				
-				glm::mat4 aniMatrix2=glm::toMat4(bf->quaternion);
-				
-				cout<<"b->relativeForm:"<<endl;
-				cout<<b->relativeForm[0][0]<<" "<<b->relativeForm[0][1]<<" "<<b->relativeForm[0][2]<<" "<<b->relativeForm[0][3]<<endl
-				<<b->relativeForm[1][0]<<" "<<b->relativeForm[1][1]<<" "<<b->relativeForm[1][2]<<" "<<b->relativeForm[1][3]<<endl
-				<<b->relativeForm[2][0]<<" "<<b->relativeForm[2][1]<<" "<<b->relativeForm[2][2]<<" "<<b->relativeForm[2][3]<<endl
-				<<b->relativeForm[3][0]<<" "<<b->relativeForm[3][1]<<" "<<b->relativeForm[3][2]<<" "<<b->relativeForm[3][3]<<endl<<endl;
-				
-				
-				
-				if(b->parentBoneIndex==-1)
-				{
-					b->absoluteForm=b->relativeForm;
-					
-					Bone[i] = b->absoluteForm * invBindPose[i];
-				}
-				else
-				{
-					/*if(b->parentBoneIndex>=i)
-					{
-						cerr<<"ERROR: Child before Parent"<<endl;
-						exit(EXIT_FAILURE);
-					}*/
-					
-					//b->relativeForm= (aniMatrix);
-					//b->absoluteForm= aniMatrix * pmxInfo.bones[b->parentBoneIndex]->absoluteForm;
-					//b->absoluteForm= aniMatrix * pmxInfo.bones[b->parentBoneIndex]->absoluteForm;
-					
-					//Bone[i] = boneFix(targetFrame,b,i) * invBindPose[i];
-					//Bone[i] =  b->absoluteForm * invBindPose[i];
-					Bone[i] =  aniMatrix * pmxInfo.bones[b->parentBoneIndex]->absoluteForm * invBindPose[i];
-					//Bone[i] = b->absoluteForm * invBindPose[i];					
-					//Bone[i] = setBoneToFrame(b,*bf) * invBindPose[i];
-				}
+				finalPosition=qtransform(parentBone->finalRotation, (b->position - parentBone->position + bf->position)) + parentBone->finalPosition;
+				finalRotation=quatMultiplication(parentBone->finalRotation, bf->quaternion);
+			}
 		}
 		else
 		{
-			b->absoluteForm=pmxInfo.bones[b->parentBoneIndex]->absoluteForm * b->relativeForm;
-			
-			Bone[i] = b->absoluteForm * invBindPose[i];	
+			if(b->parentBoneIndex==-1)
+			{
+				finalPosition=b->position;
+			}
+			else
+			{
+				PMXBone *parentBone=pmxInfo.bones[b->parentBoneIndex];
+				
+				finalPosition=qtransform(parentBone->finalRotation, (b->position - parentBone->position)) + parentBone->finalPosition;
+				finalRotation=parentBone->finalRotation;
+			}
 		}
 		
-		cout<<"Final Bone: "<<endl;
-		cout<<Bone[i][0][0]<<" "<<Bone[i][0][1]<<" "<<Bone[i][0][2]<<" "<<Bone[i][0][3]<<endl
-		<<Bone[i][1][0]<<" "<<Bone[i][1][1]<<" "<<Bone[i][1][2]<<" "<<Bone[i][1][3]<<endl
-		<<Bone[i][2][0]<<" "<<Bone[i][2][1]<<" "<<Bone[i][2][2]<<" "<<Bone[i][2][3]<<endl
-		<<Bone[i][3][0]<<" "<<Bone[i][3][1]<<" "<<Bone[i][3][2]<<" "<<Bone[i][3][3]<<endl<<endl;
+		b->absoluteForm=glm::toMat4(finalRotation);
+		b->absoluteForm[3][0]=finalPosition.x;
+		b->absoluteForm[3][1]=finalPosition.y;
+		b->absoluteForm[3][2]=finalPosition.z;
+		
+			
+		b->finalRotation=finalRotation;
+		b->finalPosition=finalPosition;
+			
+		Bone[i] = b->absoluteForm;
 	}
+}*/
+
+/*void setModelToKeyFrame3(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInfo, VMDInfo &vmdInfo)
+{
+	//individualBoneMotions is translation/rotation of each bone from it's original position
+	//boneMotions is total position/rotation of each bone
+	//boneMotions is an array like [{p, r, tainted}]
+	//tainted flag is used to avoid re-creating vec3/quat4
 	
-	GLuint Bones_loc=glGetUniformLocation(shaderProgram,"Bones");
-	glUniformMatrix4fv(Bones_loc, pmxInfo.bone_continuing_datasets, GL_FALSE, &Bone[0][0][0]);
 	
+	individualBoneMotions = []
+	boneMotions = []
+	originalBonePositions = []
+	parentBones = []
+	constrainedBones = []
+
+	for(size_t i=0; i<pmxInfo.bone_continuing_datasets; i++)
+	{
+		PMXBone *b=pmxInfo.bones[i];
+		BoneFrame *bf=getBoneFrame(targetFrame,b->name);
+		
+		
+	}
+
+
+    # calculate positions/rotations of bones other than IK
+    getBoneMotion(i) for i in [0...model.bones.length]
+
+    rotations1 = model.rotations1
+    rotations2 = model.rotations2
+    positions1 = model.positions1
+    positions2 = model.positions2
+
+    length = model.vertices.length
+    for i in [0...length]
+      vertex = model.vertices[i]
+      motion1 = boneMotions[vertex.bone_num1]
+      motion2 = boneMotions[vertex.bone_num2]
+      rot1 = motion1.r
+      pos1 = motion1.p
+      rot2 = motion2.r
+      pos2 = motion2.p
+      rotations1[i * 4 ] = rot1[0]
+      rotations1[i * 4 + 1] = rot1[1]
+      rotations1[i * 4 + 2] = rot1[2]
+      rotations1[i * 4 + 3] = rot1[3]
+      rotations2[i * 4 ] = rot2[0]
+      rotations2[i * 4 + 1] = rot2[1]
+      rotations2[i * 4 + 2] = rot2[2]
+      rotations2[i * 4 + 3] = rot2[3]
+      positions1[i * 3 ] = pos1[0]
+      positions1[i * 3 + 1] = pos1[1]
+      positions1[i * 3 + 2] = pos1[2]
+      positions2[i * 3 ] = pos2[0]
+      positions2[i * 3 + 1] = pos2[1]
+      positions2[i * 3 + 2] = pos2[2]
+
+    @gl.bindBuffer(@gl.ARRAY_BUFFER, @vbuffers.aBone1Rotation.buffer)
+    @gl.bufferData(@gl.ARRAY_BUFFER, rotations1, @gl.STATIC_DRAW)
+    @gl.bindBuffer(@gl.ARRAY_BUFFER, @vbuffers.aBone2Rotation.buffer)
+    @gl.bufferData(@gl.ARRAY_BUFFER, rotations2, @gl.STATIC_DRAW)
+    @gl.bindBuffer(@gl.ARRAY_BUFFER, @vbuffers.aBone1Position.buffer)
+    @gl.bufferData(@gl.ARRAY_BUFFER, positions1, @gl.STATIC_DRAW)
+    @gl.bindBuffer(@gl.ARRAY_BUFFER, @vbuffers.aBone2Position.buffer)
+    @gl.bufferData(@gl.ARRAY_BUFFER, positions2, @gl.STATIC_DRAW)
+    @gl.bindBuffer(@gl.ARRAY_BUFFER, null)
+    return
+}*/
+
 	
-	
-	cout<<"END BONE READ"<<endl;
-}
 
 struct VertexData
 {
 	glm::vec4 position;
 	glm::vec2 UV;
 	glm::vec3 normal;
-	
+
 	GLfloat weightFormula;
-	
+
 	GLfloat boneIndex1;
 	GLfloat boneIndex2;
 	GLfloat boneIndex3;
 	GLfloat boneIndex4;
-	
+
 	GLfloat weight1;
 	GLfloat weight2;
 	GLfloat weight3;
 	GLfloat weight4;
-};
 
+	string str()
+	{	
+		std::stringstream ss;
+		ss << position.x << " " << position.y << " " << position.z << " " << position.w << endl;
+		ss << UV.x << " " << UV.y << endl;
+		ss << normal.x << " " << normal.y << " " << normal.z << endl;
+		ss << boneIndex1 << " " << boneIndex2 << " " << boneIndex3 << " " << boneIndex4 << endl;
+		ss << weight1 << " " << weight2 << " " << weight3 << " " << weight4 << endl;
+
+		return ss.str();
+	}
+};
+     
 GLuint shaderProgram;
 void init(PMXInfo &pmxInfo, VMDInfo &vmdInfo)
 {
-	
 	shaderProgram=loadShaders();
-	
+
 	//Load Textures
 	loadTextures(pmxInfo);
 	
+	#ifdef MODELDUMP
+	ofstream modeldump("modeldump.txt");
+	modeldump << "indices:" << endl;
+	#endif
+           
 	//GLushort vertexIndices[pmxInfo.face_continuing_datasets][3];
 	GLushort *vertexIndices= (GLushort*) malloc(pmxInfo.face_continuing_datasets*sizeof(GLushort)*3);
 	for(int i=0; i<pmxInfo.faces.size(); ++i) //faces.size()
@@ -434,8 +701,16 @@ void init(PMXInfo &pmxInfo, VMDInfo &vmdInfo)
 		vertexIndices[j]=pmxInfo.faces[i]->points[0];
 		vertexIndices[j+1]=pmxInfo.faces[i]->points[1];
 		vertexIndices[j+2]=pmxInfo.faces[i]->points[2];
+		
+		#ifdef MODELDUMP
+		modeldump << vertexIndices[j] << " " << vertexIndices[j+1] << " " << vertexIndices[j+2] << endl;
+		#endif
 	}
 	
+	#ifdef MODELDUMP
+	modeldump << "vertices:" << endl;
+	#endif
+
 	VertexData *vertexData = (VertexData*)malloc(pmxInfo.vertex_continuing_datasets*sizeof(VertexData));
 	for(int i=0; i<pmxInfo.vertex_continuing_datasets; ++i)
 	{
@@ -443,35 +718,43 @@ void init(PMXInfo &pmxInfo, VMDInfo &vmdInfo)
 		vertexData[i].position.y=pmxInfo.vertices[i]->pos[1];
 		vertexData[i].position.z=pmxInfo.vertices[i]->pos[2];
 		vertexData[i].position.w=1.0;
-		
+
 		vertexData[i].UV.x=pmxInfo.vertices[i]->UV[0];
 		vertexData[i].UV.y=pmxInfo.vertices[i]->UV[1];
-		
+
 		vertexData[i].normal.x=pmxInfo.vertices[i]->normal[0];
 		vertexData[i].normal.y=pmxInfo.vertices[i]->normal[1];
 		vertexData[i].normal.z=pmxInfo.vertices[i]->normal[2];
-		
+
 		vertexData[i].weightFormula=pmxInfo.vertices[i]->weight_transform_formula;
-		
+
 		vertexData[i].boneIndex1=pmxInfo.vertices[i]->boneIndex1;
 		vertexData[i].boneIndex2=pmxInfo.vertices[i]->boneIndex2;
 		vertexData[i].boneIndex3=pmxInfo.vertices[i]->boneIndex3;
 		vertexData[i].boneIndex4=pmxInfo.vertices[i]->boneIndex4;
-		
+
 		vertexData[i].weight1=pmxInfo.vertices[i]->weight1;
 		vertexData[i].weight2=pmxInfo.vertices[i]->weight2;
 		vertexData[i].weight3=pmxInfo.vertices[i]->weight3;
 		vertexData[i].weight4=pmxInfo.vertices[i]->weight4;
-		
+
+		#ifdef MODELDUMP
+		modeldump << vertexData[i].str();
+		#endif
+                   
 		//cout<<vertexData[i].position.x<<" "<<vertexData[i].position.y<<" "<<vertexData[i].position.z<<" "<<vertexData[i].position.w<<endl;
 		//cout<<vertexData[i].UV.x<<" "<<vertexData[i].UV.y<<endl;
-		
+
 		/*if(pmxInfo.vertices[i]->weight_transform_formula>2)
 		{
 			cerr<<"SDEF and QDEF not supported yet"<<endl;
 			exit(EXIT_FAILURE);
 		}*/
 	}
+	
+	#ifdef MODELDUMP
+	modeldump.close();
+	#endif
 	
 	
 	//Generate all Buffers
@@ -494,24 +777,23 @@ void init(PMXInfo &pmxInfo, VMDInfo &vmdInfo)
 	glVertexAttribPointer(vPosition, 4, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(0)); //4=number of components updated per vertex
 	glEnableVertexAttribArray(vPosition);
 	
-	glVertexAttribPointer(vUV, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(float)*4));
+	glVertexAttribPointer(vUV, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(GLfloat)*4));
 	glEnableVertexAttribArray(vUV);
 	
-	glVertexAttribPointer(vNormal, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(float)*6));
+	glVertexAttribPointer(vNormal, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(GLfloat)*6));
 	glEnableVertexAttribArray(vNormal);
 	
-	glVertexAttribPointer(vWeightFormula, 1, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(float)*9));
+	glVertexAttribPointer(vWeightFormula, 1, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(GLfloat)*9));
 	glEnableVertexAttribArray(vWeightFormula);
 	
-	glVertexAttribPointer(vBoneIndices, 4, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(float)*10));
+	glVertexAttribPointer(vBoneIndices, 4, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(GLfloat)*10));
 	glEnableVertexAttribArray(vBoneIndices);
 	
-	glVertexAttribPointer(vBoneWeights, 4, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(float)*14));
+	glVertexAttribPointer(vBoneWeights, 4, GL_FLOAT, GL_FALSE, sizeof(VertexData), BUFFER_OFFSET(sizeof(GLfloat)*14));
 	glEnableVertexAttribArray(vBoneWeights);
 	
 	free(vertexData);
 	free(vertexIndices);
-	
 	
 
 	MVP_loc = glGetUniformLocation(shaderProgram, "MVP");
@@ -535,12 +817,15 @@ void init(PMXInfo &pmxInfo, VMDInfo &vmdInfo)
 		bindPose[i] = (pmxInfo.bones[i]->absoluteForm);
 		invBindPose[i] = glm::inverse(bindPose[i]);
 	}
-	glm::mat4 *Bone=new glm::mat4[pmxInfo.bone_continuing_datasets]();
+	Bone=new glm::mat4[pmxInfo.bone_continuing_datasets]();
 	//setModelToKeyFrame(Bone,shaderProgram, pmxInfo, vmdInfo);
 	
-	free(bindPose);
-	free(invBindPose);
-	free(Bone);
+	GLuint Bones_loc=glGetUniformLocation(shaderProgram,"Bones");
+	glUniformMatrix4fv(Bones_loc, pmxInfo.bone_continuing_datasets, GL_FALSE, &Bone[0][0][0]);
+	
+	//free(bindPose);
+	//free(invBindPose);
+	//free(Bone);
     
     glDisable(GL_CULL_FACE);
 	glEnable(GL_DEPTH_TEST);
@@ -591,7 +876,8 @@ void drawModel(PMXInfo &pmxInfo)
 	glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, &MVP[0][0]);
 	
 	//Setup Uniform variables for Bone data
-	
+	GLuint Bones_loc = glGetUniformLocation(shaderProgram, "Bones");
+	glUniformMatrix4fv(Bones_loc, pmxInfo.bone_continuing_datasets, GL_FALSE, (const GLfloat*)Bone);
 	
 	
 	
@@ -657,6 +943,29 @@ void resize(int w, int h)
 void key(unsigned char key, int x, int y)
 {
 	if (key == 'q') exit(0);
+	
+	else if(key=='w') boneQuat.x+=.01f;
+	else if(key=='s') boneQuat.x-=.01f;
+	else if(key=='e') boneQuat.y+=.01f;
+	else if(key=='d') boneQuat.y-=.01f;
+	else if(key=='r') boneQuat.z+=.01f;
+	else if(key=='f') boneQuat.z-=.01f;
+	else if(key=='t') boneQuat.w+=.01f;
+	else if(key=='g') boneQuat.w-=.01f;
+	
+	else if(key=='y') boneQuat2.x+=.01f;
+	else if(key=='h') boneQuat2.x-=.01f;
+	else if(key=='u') boneQuat2.y+=.01f;
+	else if(key=='j') boneQuat2.y-=.01f;
+	else if(key=='i') boneQuat2.z+=.01f;
+	else if(key=='k') boneQuat2.z-=.01f;
+	else if(key=='o') boneQuat2.w+=.01f;
+	else if(key=='l') boneQuat2.w-=.01f;
+	
+	
+	setModelToKeyFrameSingleQuat(Bone, shaderProgram, pmxInfo, vmdInfo);
+	
+	glutPostRedisplay();
 }
 
 void processSpecialKeys(int key, int xx, int yy) {
@@ -756,8 +1065,10 @@ void mouseMotion(int x, int y)
 
 int main(int argc, char** argv)
 {
+	log("Starting PMXViewer v0.1");
 	pmxInfo=readPMX("data/model/gumiv3/","GUMI_V3.pmx");
 	vmdInfo=readVMD("data/motion/Masked bitcH/Masked bitcH.vmd");
+	log("Model loaded");
 	
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
@@ -766,6 +1077,7 @@ int main(int argc, char** argv)
 	glutInitContextVersion(3,2);
 	glutInitContextProfile(GLUT_CORE_PROFILE);
 	glutCreateWindow(argv[0]);
+	
 	
 	glewExperimental = GL_TRUE; 
 	if(glewInit())
@@ -787,5 +1099,6 @@ int main(int argc, char** argv)
 	
 	glutMainLoop();
 	
+	delete pmxvLogger::get();
 	return 0;
 }

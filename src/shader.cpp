@@ -8,12 +8,12 @@ using namespace std;
 
 const GLchar* ReadShader(const char* filename)
 {
-#ifdef WIN32
+#ifdef _WIN32
 	FILE* infile;
 	fopen_s( &infile, filename, "rb" );
 #else
     FILE* infile = fopen( filename, "rb" );
-#endif // WIN32
+#endif //_WIN32
 
     if ( !infile ) {
 #ifdef _DEBUG

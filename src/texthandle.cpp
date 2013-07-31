@@ -15,7 +15,7 @@ std::string sjisToUTF8(char *sjis)
 	size_t	out_size = (size_t)MAX_BUF;
 	iconv_t ic = iconv_open("UTF-8", "SJIS");
 
-	memcpy( in, sjis, sizeof(sjis) );
+	memcpy( in, sjis, strlen(sjis) );
 
 	iconv( ic, &in, &in_size, &out, &out_size );
 	iconv_close(ic);

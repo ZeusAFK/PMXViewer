@@ -5,6 +5,8 @@
 #include <bitset>
 #include <sstream>
 
+#include <string.h>
+
 #include "Converter.h"
 
 using namespace std;
@@ -54,21 +56,22 @@ using namespace std;
 
 
 
-void getPMXText(ifstream &miku, PMXInfo &pmxInfo, string &result, bool debug)
+/*void getPMXText(ifstream &miku, PMXInfo &pmxInfo, string &result, bool debug)
 {
-	uint32_t text_size;
+	uint32_t text_size; //text size in bytes
 	miku.read((char*)&text_size,4);
+	
+	if(text_size==0) return;
 	
 	//cout<<"Text Size: "<<text_size<<endl;
 	if(pmxInfo.unicode_type==PMX_ENCODE_UTF16)
 	{
 		//WARNING: UTF-16 text-pulling code does NOT support the extra (multi-byte) codesets of UTF-16!!!!
 		
-		
 		#ifdef _WIN32
 		
 		
-		char16_t c16[text_size];
+		char16_t c16[text_size/2];
 		for(int i=0; i<text_size; ++i)
 		{
 			c16[i]=0;
@@ -104,7 +107,7 @@ void getPMXText(ifstream &miku, PMXInfo &pmxInfo, string &result, bool debug)
 		result = to_u8string(c16);
 		if(debug)cout<<"Result: "<<result<<endl;
 
-		#endif // WIN32
+		#endif //_WIN32
 		
 		//exit(EXIT_SUCCESS);
 	}
@@ -114,6 +117,49 @@ void getPMXText(ifstream &miku, PMXInfo &pmxInfo, string &result, bool debug)
 		char c8[text_size];
 		miku.read((char*)&c8,text_size);
 		
+		result=c8;
+	}
+}*/
+
+void getPMXText(ifstream &miku, PMXInfo &pmxInfo, string &result, bool debug)
+{
+	uint32_t text_size;
+	miku.read((char*)&text_size,4);
+
+	if(!text_size)
+		return;
+     
+	if(pmxInfo.unicode_type==PMX_ENCODE_UTF16)
+	{
+		//WARNING: UTF-16 text-pulling code does NOT support the extra (multi-byte) codesets of UTF-16!!!!             
+		unsigned short c16[text_size/2+1];
+		memset(c16, 0, text_size+2);
+		miku.read((char*)c16, text_size);
+
+		#ifndef _WIN32
+		result=UTF16to8(c16);
+		#else
+		result = to_u8string((const u16string&)c16);
+		#endif
+
+		ofstream converted;
+		converted.open("converted.txt", ios::out | ios::app);
+		//converted.seekp(ios_base::end);
+		//converted.write((char*)c16, text_size);
+		converted<<result<<endl;
+		converted << '\n';
+		converted.close();
+
+
+
+		//exit(EXIT_SUCCESS);
+	}
+	else
+	{
+		//WARNING: Loading UTF-8 encoded PMX files is untested
+		char c8[text_size];
+		miku.read((char*)&c8,text_size);
+
 		result=c8;
 	}
 }
@@ -179,6 +225,8 @@ int getBone(PMXInfo &pmxInfo, string &name)
 	
 	return -1;
 }
+
+void printDebugInfo(PMXInfo &pmxInfo);
 
 PMXInfo &readPMX(string foldername,string filename)
 {
@@ -377,6 +425,12 @@ PMXInfo &readPMX(string foldername,string filename)
 		getPMXText(miku, pmxInfo, pmxInfo.texturePaths[i]);
 		
 		pmxInfo.texturePaths[i].insert(0,foldername);
+		
+		while(pmxInfo.texturePaths[i].find("\\")!=-1)
+		{
+			int index=pmxInfo.texturePaths[i].find("\\");
+			pmxInfo.texturePaths[i][index]='/';
+		}
 	}
 	cout<<"done."<<endl;
 	
@@ -501,6 +555,12 @@ PMXInfo &readPMX(string foldername,string filename)
 		bone->parentBoneIndex=(int)*tmpBoneIndex;
 		delete tmpBoneIndex;
 		
+		if(bone->parentBoneIndex<-1)
+		{
+			cerr<<"WARNING: Negative Bone Index greater than -1 found: "<<bone->name<<" "<<bone->parentBoneIndex<<endl;
+			bone->parentBoneIndex=-bone->parentBoneIndex;
+		}
+		
 		/*cout<<(int)*tmpBoneIndex<<endl;
 		cout<<"PBI: "<<bone->parentBoneIndex<<endl;*/
 		
@@ -608,12 +668,6 @@ PMXInfo &readPMX(string foldername,string filename)
 				
 				bone->IKLinks.push_back(link);
 			}
-		}
-		
-		//if(bone->parentBoneIndex==-128)
-		{
-			//cout<<bone->name<<endl;
-			//cout<<bone->
 		}
 		
 		bone->relativeForm[3][0]=bone->position.x;
@@ -765,8 +819,10 @@ PMXInfo &readPMX(string foldername,string filename)
 				
 				case MORPH_TYPE_GROUP:
 				{
-					cerr<<"No group morph support yet"<<endl;
-					exit(EXIT_FAILURE);
+					PMXGroupMorph *groupMorph=new PMXGroupMorph();
+					
+					miku.read((char*)&groupMorph->morphIndex,(int)pmxInfo.morphIndexSize);
+					miku.read((char*)&groupMorph->morphRate,4);
 				}
 				break;
 				
@@ -832,7 +888,11 @@ PMXInfo &readPMX(string foldername,string filename)
 		getPMXText(miku, pmxInfo, rb->name);
 		getPMXText(miku, pmxInfo, rb->nameEng);
 		
-		miku.read((char*)&rb->relatedBoneIndex,pmxInfo.boneIndexSize);
+		char *tmpBoneIndex=(char*) malloc(pmxInfo.boneIndexSize);
+		miku.read(tmpBoneIndex,(int)pmxInfo.boneIndexSize);
+		
+		rb->relatedBoneIndex=(int)*tmpBoneIndex;
+		delete tmpBoneIndex;
 		
 		miku.read((char*)&rb->group,1);
 		miku.read((char*)&rb->noCollisionGroupFlag,2);
@@ -919,8 +979,6 @@ PMXInfo &readPMX(string foldername,string filename)
 	
 	cout<<"done"<<endl<<endl;
 	
-	return pmxInfo;
-	
 	/*cout<<"Miku Good: "<<miku.good()<<endl;
 	
 	char data_byte[1];
@@ -935,9 +993,11 @@ PMXInfo &readPMX(string foldername,string filename)
 	
 	cerr<<"END PMX LOAD"<<endl;*/
 	
-	//printDebugInfo();
+	//printDebugInfo(pmxInfo);
 	
 	//exit(EXIT_SUCCESS);
+	
+	return pmxInfo;
 }
 
 void printDebugInfo(PMXInfo &pmxInfo)
