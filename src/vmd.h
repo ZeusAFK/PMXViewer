@@ -18,6 +18,23 @@ VMDInfo &readVMD(std::string filename);
 
 //VMD related structs
 
+struct BezierParameters
+{
+	//See "On VMD Interpolation Parameters.txt" in DOCs for information concerning bezier parameters.
+	
+	glm::vec2 X1;
+	glm::vec2 X2;
+	
+	glm::vec2 Y1;
+	glm::vec2 Y2;
+	
+	glm::vec2 Z1;
+	glm::vec2 Z2;
+	
+	glm::vec2 R1;
+	glm::vec2 R2;
+};
+
 struct BoneFrame
 {
 	std::string name; //char[15] before UTF8 conversion
@@ -27,7 +44,7 @@ struct BoneFrame
 	glm::vec3 translation; //values will be 0 when there's no position
 	glm::quat quaternion; //values will be 0 when there's no position (w will be 1.0)
 	
-	std::string interpolationParameters; //char[64] before UTF8 conversion
+	BezierParameters bezier;
 };
 
 struct MorphFrame

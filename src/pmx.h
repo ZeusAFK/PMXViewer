@@ -110,7 +110,7 @@ struct PMXMaterial
 
 struct PMXIKLink
 {
-	unsigned int linkBoneIndex;
+	unsigned linkBoneIndex;
 	bool angleLimit; //0:OFF 1:ON
 	
 	//If angleLimit==1
@@ -173,11 +173,11 @@ struct PMXBone
 	int keyValue;
 	
 	//If IK==1
-	unsigned int IKTargetBoneIndex;
-	int IKLoopCount; //In PMD and MMD environments, this caps at 255 apparently
-	float IKLoopRadianAngle; //At the time of loop calculation, restriction angle (about once) (<-?)
+	unsigned IKTargetBoneIndex;
+	unsigned IKLoopCount; //In PMD and MMD environments, this caps at 255 apparently
+	float IKLoopAngleLimit; //At the time of loop calculation, angle limit each time the loop is run (Warning: 4x the value it was in PMD files)
 	
-	int IKLinkNum; //Number of continuing IK(Inverse Kinetics) elements
+	unsigned IKLinkNum; //Number of continuing IK(Inverse Kinetics) elements
 	std::vector<PMXIKLink*> IKLinks;
 	
 	
@@ -191,6 +191,7 @@ struct PMXBone
 
 struct PMXMorphData
 {
+	//Only inherited classes used
 };
 
 struct PMXVertexMorph: PMXMorphData

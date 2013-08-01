@@ -658,7 +658,7 @@ PMXInfo &readPMX(string foldername,string filename)
 		{
 			miku.read((char*)&bone->IKTargetBoneIndex,(int)pmxInfo.boneIndexSize);
 			miku.read((char*)&bone->IKLoopCount,4);
-			miku.read((char*)&bone->IKLoopRadianAngle,4);
+			miku.read((char*)&bone->IKLoopAngleLimit,4);
 			
 			miku.read((char*)&bone->IKLinkNum,4);
 			

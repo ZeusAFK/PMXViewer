@@ -55,9 +55,34 @@ VMDInfo &readVMD(string filename)
 		miku.read((char*)&f->quaternion.z,4);
 		miku.read((char*)&f->quaternion.w,4);
 		
-		char bezier[64];
-		miku.read((char*)&bezier,64);
-		f->interpolationParameters=bezier;//sjisToUTF8(bezier);
+		int8_t bezier[64];
+		miku.read((char*)bezier,64);
+		
+		//line 1
+		f->bezier.X1.x=bezier[0];
+		f->bezier.Y1.x=bezier[1];
+		f->bezier.Z1.x=bezier[2];
+		f->bezier.R1.x=bezier[3];
+		
+		f->bezier.X1.y=bezier[4];
+		f->bezier.Y1.y=bezier[5];
+		f->bezier.Z1.y=bezier[6];
+		f->bezier.R1.y=bezier[7];
+		
+		//line 2
+		f->bezier.X2.x=bezier[8];
+		f->bezier.Y2.x=bezier[9];
+		f->bezier.Z2.x=bezier[10];
+		f->bezier.R2.x=bezier[11];
+		
+		f->bezier.X2.y=bezier[12];
+		f->bezier.Y2.y=bezier[13];
+		f->bezier.Z2.y=bezier[14];
+		f->bezier.R2.y=bezier[15];
+		
+		/*cout<<f->bezier.X1.x<<" "<<f->bezier.X1.y<<" "<<f->bezier.Y1.x<<" "<<f->bezier.Y1.y<<" "<<f->bezier.Z1.x<<" "<<f->bezier.Z1.y<<" "<<f->bezier.R1.x<<" "<<f->bezier.R1.y<<endl
+		<<f->bezier.X2.x<<" "<<f->bezier.X2.y<<" "<<f->bezier.Y2.x<<" "<<f->bezier.Y2.y<<" "<<f->bezier.Z2.x<<" "<<f->bezier.Z2.y<<" "<<f->bezier.R2.x<<" "<<f->bezier.R2.y<<endl<<endl;*/
+		
 		
 		/*cout<<"Name: "<<f->name<<endl;
 		cout<<"Frame Number: "<<f->frame<<endl<<endl;

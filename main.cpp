@@ -27,23 +27,18 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-#define CONST_TEST_FRAME_NUMBER 0
+#define CONST_TEST_FRAME_NUMBER 1248
 
 using namespace std;
 
 enum VAO_IDs { Vertices, BoneVertices, NumVAOs };
-enum Buffer_IDs { VertexArrayBuffer, VertexIndexBuffer, BoneBuffer, NumBuffers };
+enum Buffer_IDs { VertexArrayBuffer, VertexIndexBuffer, NumBuffers };
 enum Attrib_IDs { vPosition, vUV, vNormal, vBoneIndices, vBoneWeights, vWeightFormula };
 
 GLuint VAOs[NumVAOs];
 GLuint Buffers[NumBuffers];
 
-const GLuint NumVertices=6;
-
 GLuint MVP_loc;
-
-GLuint boneOffset_loc;
-GLuint boneQuaternion_loc;
 
 PMXInfo pmxInfo;
 VMDInfo vmdInfo;
@@ -51,9 +46,10 @@ VMDInfo vmdInfo;
 glm::mat4 *invBindPose;
 
 glm::mat4 *Bone;
+
 vector<GLuint> textures;
 
-void loadTextures(PMXInfo &pmxInfo)
+void loadTextures(PMXInfo &pmxInfo, vector<GLuint> &textures)
 {	
 	for(int i=0; i<pmxInfo.texture_continuing_datasets; ++i)
 	{
@@ -161,57 +157,117 @@ BoneFrame *getBoneFrame(int frame, string boneName)
 
 void setModelToKeyFrame(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInfo, VMDInfo &vmdInfo)
 {
-
 	int targetFrame = CONST_TEST_FRAME_NUMBER;
-	glm::mat4 aniMatrix;
 	
-	// root bone
+	// Root bone
 	PMXBone   *b  = pmxInfo.bones[0];
 	BoneFrame *bf = getBoneFrame(targetFrame, b->name);
+	
+	//Print list of keyframe #s
+	/*int lastFrame=-1;
+	for(int i=0; i<vmdInfo.boneCount; ++i)
+	{
+		if(vmdInfo.boneFrames[i].frame!=lastFrame)
+		{
+			cout<<vmdInfo.boneFrames[i].frame<<endl;
+			lastFrame=vmdInfo.boneFrames[i].frame;
+		}
+	}*/
 
 	b->absoluteForm = b->relativeForm;
 	if(bf!=NULL)
 	{
 		b->finalRotation = bf->quaternion;
 		
-		glm::vec4 homoPosition=glm::vec4(b->position + bf->translation,1.0); //position in homogeneous coordinates
-		glm::vec4 localPosition=glm::vec4(b->position,1.0);
-		
-		b->relativeForm[3][0]=localPosition[0];
-		b->relativeForm[3][1]=localPosition[1];
-		b->relativeForm[3][2]=localPosition[2];
-		b->relativeForm[3][3]=localPosition[3];
-	}
-	Bone[0] = b->absoluteForm * invBindPose[0];
+		b->relativeForm = glm::translate( b->position ) * glm::toMat4(bf->quaternion);
+		b->absoluteForm = glm::translate( bf->translation + b->position ) * glm::toMat4(bf->quaternion);
+		Bone[0] = glm::translate( bf->translation + b->position ) * glm::toMat4(bf->quaternion) * glm::translate( -b->position );
+	};
 	
 	
 	
-	// other bones
-	for (size_t i = 1; i < pmxInfo.bone_continuing_datasets; i++)
+	// Other bones
+	for (unsigned i = 1; i < pmxInfo.bone_continuing_datasets; i++)
 	{
 		b  = pmxInfo.bones[i];
 		PMXBone *parent = pmxInfo.bones[b->parentBoneIndex];
 		bf = getBoneFrame(targetFrame, b->name);
 		
 		if(bf!=NULL)
-		{
+		{			
 			b->finalRotation = bf->quaternion * parent->finalRotation;
-			
-			//First Option
+
 			b->relativeForm = glm::translate( bf->translation + b->position - parent->position ) * glm::toMat4(bf->quaternion);
-			b->absoluteForm = parent->absoluteForm * glm::translate( bf->translation + b->position - parent->position ) * glm::toMat4(bf->quaternion);
-			Bone[i] = parent->absoluteForm * glm::translate( bf->translation + b->position - parent->position ) * glm::toMat4(bf->quaternion) * glm::translate( -b->position );
+			b->absoluteForm = parent->absoluteForm * b->relativeForm;
+			Bone[i] = b->absoluteForm * invBindPose[i];
 		}
 		else
 		{
 			b->finalRotation = parent->finalRotation;
 			
 			b->relativeForm = glm::translate( b->position - parent->position );
-			b->absoluteForm = parent->absoluteForm * glm::translate( b->position - parent->position );
-			Bone[i] = parent->absoluteForm * glm::translate( b->position - parent->position ) * glm::translate( -b->position );
+			b->absoluteForm = parent->absoluteForm * b->relativeForm;
+			Bone[i] = b->absoluteForm * invBindPose[i];
 		}
 			
 	}
+	
+	
+	// IK Bones
+	/*glm::vec4 localEffectorPos, localTargetPos;
+	
+	for(unsigned b=0; b<pmxInfo.bone_continuing_datasets; ++b)
+	{
+		PMXBone *bone=pmxInfo.bones[b];
+		if(bone->IK)
+		{
+			PMXBone *targetBone=pmxInfo.bones[bone->IKTargetBoneIndex];
+			
+			cout<<"IK Bone: "<<bone->name<<" "<<bone->IKTargetBoneIndex<<" "<<bone->IKLoopCount<<" "<<bone->IKLoopAngleLimit<<endl;
+			
+			cout<<"IKLinkNum: "<<bone->IKLinkNum<<endl;
+			cout<<"IKLoopCount: "<<bone->IKLoopCount<<endl;
+			for(unsigned iterations=0; iterations<bone->IKLoopCount; ++iterations)
+			{
+				for(unsigned ik=0; ik<bone->IKLinkNum; ++ik)
+				{
+					PMXIKLink *IKLink=bone->IKLinks[ik];
+					PMXBone *linkBone=pmxInfo.bones[IKLink->linkBoneIndex];
+				
+					//cout<<targetBone->name<<" "<<linkBone->name<<" "<<endl;
+				
+					glm::vec4 effectorPos=glm::vec4(targetBone->position,1.0);
+					glm::vec4 targetPos=glm::vec4(targetBone->position,1.0);
+
+					glm::mat4 invCoord=glm::inverse(linkBone->relativeForm);
+				
+					localEffectorPos=invCoord * effectorPos;
+					localTargetPos=invCoord * targetPos;
+				
+					glm::vec4 localEffectorDir=glm::normalize(localEffectorPos);
+					glm::vec4 localTargetDir=glm::normalize(localTargetPos);
+				
+					//NOTE: Left out hip's if-clause
+					
+					float p=glm::dot(localEffectorDir,localTargetDir);
+					if(p > 1 - 1.0e-5f) continue;	// Warning: there is a chance of acos() exceeding 1 due to calculation errors!
+					float angle = acos(p);
+					if (angle > bone->IKLoopAngleLimit) angle = bone->IKLoopAngleLimit;
+				
+					glm::vec3 axis=glm::cross(glm::vec3(localEffectorDir),glm::vec3(localTargetDir));
+					glm::mat4 rotation=glm::rotate(angle,axis);
+				
+					//NOTE: left out hip's if-clause (again)
+				
+					cout<<"IK transformation made"<<endl;
+				
+					Bone[IKLink->linkBoneIndex]=Bone[IKLink->linkBoneIndex] * rotation;
+				
+					//NOTE: Left out error-tolerance check
+				}
+			}
+		}
+	}*/
 }
 
 struct VertexData
@@ -247,11 +303,11 @@ struct VertexData
      
 GLuint shaderProgram;
 void init(PMXInfo &pmxInfo, VMDInfo &vmdInfo)
-{
+{	
 	shaderProgram=loadShaders();
 
 	//Load Textures
-	loadTextures(pmxInfo);
+	loadTextures(pmxInfo,textures);
 	
 	#ifdef MODELDUMP
 	ofstream modeldump("modeldump.txt");
@@ -405,7 +461,7 @@ glm::vec3 cameraPosition(0.0f, 0.0f, radius*sin(theta));
 glm::vec3 cameraTarget(0.0f,0.0f,0.0f);
 
 
-glm::vec3 modelTranslate(0.0f,-16.0f,0.0f);
+glm::vec3 modelTranslate(0.0f,0.0f,0.0f);
 
 void drawModel(PMXInfo &pmxInfo)
 {
