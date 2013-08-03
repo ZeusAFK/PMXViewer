@@ -182,11 +182,7 @@ struct PMXBone
 	
 	
 	//VARIABLES I ADDED BELOW THIS POINT
-	
 	glm::mat4 relativeForm,absoluteForm;
-	
-	glm::vec3 finalPosition;
-	glm::quat finalRotation;
 };
 
 struct PMXMorphData

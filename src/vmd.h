@@ -45,6 +45,12 @@ struct BoneFrame
 	glm::quat quaternion; //values will be 0 when there's no position (w will be 1.0)
 	
 	BezierParameters bezier;
+	
+	bool operator < (const BoneFrame &k) const
+	{
+		//Comparison by frame number
+		return frame < k.frame;
+	}
 };
 
 struct MorphFrame

@@ -18,6 +18,7 @@
 #include "src/texthandle.h"
 #include "src/pmx.h"
 #include "src/vmd.h"
+#include "src/motioncontroller.h"
 #include "src/shader.h"
 #include "src/pmxvLogger.h"
 
@@ -27,7 +28,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-#define CONST_TEST_FRAME_NUMBER 1248
+#define CONST_TEST_FRAME_NUMBER 1470
 
 using namespace std;
 
@@ -42,10 +43,7 @@ GLuint MVP_loc;
 
 PMXInfo pmxInfo;
 VMDInfo vmdInfo;
-
-glm::mat4 *invBindPose;
-
-glm::mat4 *Bone;
+VMDMotionController *motionController;
 
 vector<GLuint> textures;
 
@@ -135,140 +133,7 @@ void loadTextures(PMXInfo &pmxInfo, vector<GLuint> &textures)
 	}
 }
 
-BoneFrame *getBoneFrame(int frame, string boneName)
-{
-	stringstream ss;
-	
-	for(int i=0; i<vmdInfo.boneCount; ++i)
-	{		
-		//cout<<"VMD NAME: "<<vmdInfo.boneFrames[i].name<<endl;
-		if(vmdInfo.boneFrames[i].name==boneName && vmdInfo.boneFrames[i].frame==frame)
-		{
-			return &vmdInfo.boneFrames[i];
-		}
-	}
-	
-	
-	//cerr<<"No bone found: "<<boneName<<endl;
-	
-	return NULL;
-}
 
-
-void setModelToKeyFrame(glm::mat4 Bone[], GLuint &shaderProgram, PMXInfo &pmxInfo, VMDInfo &vmdInfo)
-{
-	int targetFrame = CONST_TEST_FRAME_NUMBER;
-	
-	// Root bone
-	PMXBone   *b  = pmxInfo.bones[0];
-	BoneFrame *bf = getBoneFrame(targetFrame, b->name);
-	
-	//Print list of keyframe #s
-	/*int lastFrame=-1;
-	for(int i=0; i<vmdInfo.boneCount; ++i)
-	{
-		if(vmdInfo.boneFrames[i].frame!=lastFrame)
-		{
-			cout<<vmdInfo.boneFrames[i].frame<<endl;
-			lastFrame=vmdInfo.boneFrames[i].frame;
-		}
-	}*/
-
-	b->absoluteForm = b->relativeForm;
-	if(bf!=NULL)
-	{
-		b->finalRotation = bf->quaternion;
-		
-		b->relativeForm = glm::translate( b->position ) * glm::toMat4(bf->quaternion);
-		b->absoluteForm = glm::translate( bf->translation + b->position ) * glm::toMat4(bf->quaternion);
-		Bone[0] = glm::translate( bf->translation + b->position ) * glm::toMat4(bf->quaternion) * glm::translate( -b->position );
-	};
-	
-	
-	
-	// Other bones
-	for (unsigned i = 1; i < pmxInfo.bone_continuing_datasets; i++)
-	{
-		b  = pmxInfo.bones[i];
-		PMXBone *parent = pmxInfo.bones[b->parentBoneIndex];
-		bf = getBoneFrame(targetFrame, b->name);
-		
-		if(bf!=NULL)
-		{			
-			b->finalRotation = bf->quaternion * parent->finalRotation;
-
-			b->relativeForm = glm::translate( bf->translation + b->position - parent->position ) * glm::toMat4(bf->quaternion);
-			b->absoluteForm = parent->absoluteForm * b->relativeForm;
-			Bone[i] = b->absoluteForm * invBindPose[i];
-		}
-		else
-		{
-			b->finalRotation = parent->finalRotation;
-			
-			b->relativeForm = glm::translate( b->position - parent->position );
-			b->absoluteForm = parent->absoluteForm * b->relativeForm;
-			Bone[i] = b->absoluteForm * invBindPose[i];
-		}
-			
-	}
-	
-	
-	// IK Bones
-	/*glm::vec4 localEffectorPos, localTargetPos;
-	
-	for(unsigned b=0; b<pmxInfo.bone_continuing_datasets; ++b)
-	{
-		PMXBone *bone=pmxInfo.bones[b];
-		if(bone->IK)
-		{
-			PMXBone *targetBone=pmxInfo.bones[bone->IKTargetBoneIndex];
-			
-			cout<<"IK Bone: "<<bone->name<<" "<<bone->IKTargetBoneIndex<<" "<<bone->IKLoopCount<<" "<<bone->IKLoopAngleLimit<<endl;
-			
-			cout<<"IKLinkNum: "<<bone->IKLinkNum<<endl;
-			cout<<"IKLoopCount: "<<bone->IKLoopCount<<endl;
-			for(unsigned iterations=0; iterations<bone->IKLoopCount; ++iterations)
-			{
-				for(unsigned ik=0; ik<bone->IKLinkNum; ++ik)
-				{
-					PMXIKLink *IKLink=bone->IKLinks[ik];
-					PMXBone *linkBone=pmxInfo.bones[IKLink->linkBoneIndex];
-				
-					//cout<<targetBone->name<<" "<<linkBone->name<<" "<<endl;
-				
-					glm::vec4 effectorPos=glm::vec4(targetBone->position,1.0);
-					glm::vec4 targetPos=glm::vec4(targetBone->position,1.0);
-
-					glm::mat4 invCoord=glm::inverse(linkBone->relativeForm);
-				
-					localEffectorPos=invCoord * effectorPos;
-					localTargetPos=invCoord * targetPos;
-				
-					glm::vec4 localEffectorDir=glm::normalize(localEffectorPos);
-					glm::vec4 localTargetDir=glm::normalize(localTargetPos);
-				
-					//NOTE: Left out hip's if-clause
-					
-					float p=glm::dot(localEffectorDir,localTargetDir);
-					if(p > 1 - 1.0e-5f) continue;	// Warning: there is a chance of acos() exceeding 1 due to calculation errors!
-					float angle = acos(p);
-					if (angle > bone->IKLoopAngleLimit) angle = bone->IKLoopAngleLimit;
-				
-					glm::vec3 axis=glm::cross(glm::vec3(localEffectorDir),glm::vec3(localTargetDir));
-					glm::mat4 rotation=glm::rotate(angle,axis);
-				
-					//NOTE: left out hip's if-clause (again)
-				
-					cout<<"IK transformation made"<<endl;
-				
-					Bone[IKLink->linkBoneIndex]=Bone[IKLink->linkBoneIndex] * rotation;
-				
-					//NOTE: Left out error-tolerance check
-				}
-			}
-		}
-	}*/
-}
 
 struct VertexData
 {
@@ -419,22 +284,8 @@ void init(PMXInfo &pmxInfo, VMDInfo &vmdInfo)
 
 	MVP_loc = glGetUniformLocation(shaderProgram, "MVP");
 	
-	
-	invBindPose=new glm::mat4[pmxInfo.bone_continuing_datasets];
-	for(int i=0; i<pmxInfo.bone_continuing_datasets; ++i)
-	{
-		PMXBone *b = pmxInfo.bones[i];
-		invBindPose[i] = glm::translate( -b->position );
-	}
-	Bone=new glm::mat4[pmxInfo.bone_continuing_datasets]();
-	setModelToKeyFrame(Bone,shaderProgram, pmxInfo, vmdInfo);
-	
-	GLuint Bones_loc=glGetUniformLocation(shaderProgram,"Bones");
-	glUniformMatrix4fv(Bones_loc, pmxInfo.bone_continuing_datasets, GL_FALSE, &Bone[0][0][0]);
-	
-	//free(bindPose);
-	//free(invBindPose);
-	//free(Bone);
+	motionController=new VMDMotionController(pmxInfo,vmdInfo,shaderProgram);
+	motionController->updateBoneMatrix();
     
     glDisable(GL_CULL_FACE);
 	glEnable(GL_DEPTH_TEST);
@@ -461,10 +312,10 @@ glm::vec3 cameraPosition(0.0f, 0.0f, radius*sin(theta));
 glm::vec3 cameraTarget(0.0f,0.0f,0.0f);
 
 
-glm::vec3 modelTranslate(0.0f,0.0f,0.0f);
+glm::vec3 modelTranslate(0.0f,-16.0f,0.0f);
 
 void drawModel(PMXInfo &pmxInfo)
-{
+{	
 	glBindVertexArray(VAOs[Vertices]);
 	glBindBuffer(GL_ARRAY_BUFFER, Buffers[VertexArrayBuffer]);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Buffers[VertexIndexBuffer]);
@@ -484,11 +335,7 @@ void drawModel(PMXInfo &pmxInfo)
 	
 	glUniformMatrix4fv(MVP_loc, 1, GL_FALSE, &MVP[0][0]);
 	
-	//Setup Uniform variables for Bone data
-	GLuint Bones_loc = glGetUniformLocation(shaderProgram, "Bones");
-	glUniformMatrix4fv(Bones_loc, pmxInfo.bone_continuing_datasets, GL_FALSE, (const GLfloat*)Bone);
-	
-	
+	motionController->updateBoneMatrix();
 	
 	GLuint ambientColorLoc=glGetUniformLocation(shaderProgram, "ambientColor");
 	GLuint diffuseColorLoc=glGetUniformLocation(shaderProgram, "diffuseColor");
@@ -534,6 +381,13 @@ void drawModel(PMXInfo &pmxInfo)
 	}
 }
 
+
+void timer(int id)
+{
+	motionController->advanceTime();
+	glutPostRedisplay();
+}
+
 void display()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -541,6 +395,7 @@ void display()
 	drawModel(pmxInfo);
 	
 	glutSwapBuffers();
+	glutTimerFunc(16.6, timer, 0);
 }
 
 void resize(int w, int h)
@@ -552,8 +407,6 @@ void resize(int w, int h)
 void key(unsigned char key, int x, int y)
 {
 	if (key == 'q') exit(0);
-	
-	glutPostRedisplay();
 }
 
 void processSpecialKeys(int key, int xx, int yy) {
@@ -567,11 +420,9 @@ void processSpecialKeys(int key, int xx, int yy) {
 			break;
 		case GLUT_KEY_UP :
 			modelTranslate.y-=1.0;
-			glutPostRedisplay();
 			break;
 		case GLUT_KEY_DOWN :
 			modelTranslate.y+=1.0;
-			glutPostRedisplay();
 			break;
 	}
 }
@@ -588,8 +439,6 @@ void mouse(int button, int dir, int x, int y)
 	
 			cameraPosition.x=t*cos(theta);
 			cameraPosition.z=t*sin(theta);
-			
-			glutPostRedisplay();
 		break;
 		
 		case 4: //mouse scroll down
@@ -599,8 +448,6 @@ void mouse(int button, int dir, int x, int y)
 	
 			cameraPosition.x=t*cos(theta);
 			cameraPosition.z=t*sin(theta);
-			
-			glutPostRedisplay();
 		break;
 		
 		case GLUT_LEFT_BUTTON:
@@ -645,8 +492,6 @@ void mouseMotion(int x, int y)
 	//cameraPosition.z=radius*sin(theta)+radius2*cos(theta2);
 	
 	prevX=x, prevY=y;
-	
-	glutPostRedisplay();
 }
 
 
