@@ -90,20 +90,26 @@ glm::fquat Lerp(const glm::quat &v0, const glm::quat &v1, float alpha)
     return glm::fquat(interp.w, interp.x, interp.y, interp.z);
 }
 
-glm::fquat Slerp(const glm::quat &v0, const glm::quat &v1, float alpha)
+glm::fquat Slerp(glm::quat &v0, glm::quat &v1, float alpha)
 {
-    float dot = glm::dot(v0, v1);
+	float dot = glm::dot(v0, v1);
+	
+	if(dot<0.0f)
+	{
+		dot=-dot;
+		v0=-v0;
+	}
     
-    const float DOT_THRESHOLD = 0.9995f;
-    if (dot > DOT_THRESHOLD)
-        return Lerp(v0, v1, alpha);
+	const float DOT_THRESHOLD = 0.9995f;
+	if(dot > DOT_THRESHOLD)
+		return Lerp(v0, v1, alpha);
+
+	glm::clamp(dot, -1.0f, 1.0f);
+	float theta_0 = acosf(dot);
+	float theta = theta_0*alpha;
     
-    glm::clamp(dot, -1.0f, 1.0f);
-    float theta_0 = acosf(dot);
-    float theta = theta_0*alpha;
-    
-    glm::quat v2 = v1 + -v0*dot;
-    v2 = glm::normalize(v2);
+	glm::quat v2 = v1 + -v0*dot;
+	v2 = glm::normalize(v2);
     
     return v0*cos(theta) + v2*sin(theta);
 }
@@ -217,7 +223,7 @@ void VMDMotionController::updateBoneMatrix()
 
 	
 	
-	updateIK();
+	//updateIK();
 	
 	glUniformMatrix4fv(Bones_loc, pmxInfo.bone_continuing_datasets, GL_FALSE, (const GLfloat*)skinMatrix);
 }

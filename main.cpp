@@ -395,7 +395,7 @@ void display()
 	drawModel(pmxInfo);
 	
 	glutSwapBuffers();
-	glutTimerFunc(16.6, timer, 0);
+	glutTimerFunc(16, timer, 0);
 }
 
 void resize(int w, int h)
